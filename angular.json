@@ -32,6 +32,11 @@
                 "glob": "pglite.*",
                 "input": "node_modules/@electric-sql/pglite/dist",
                 "output": "./"
+              },
+              {
+                "glob": "pglite.*",
+                "input": "node_modules/@electric-sql/pglite/dist",
+                "output": "assets"
               }
             ],
             "styles": [
@@ -39,7 +44,11 @@
             ],
             "scripts": [],
             "externalDependencies": [
-              "node:module"
+              "node:module",
+              "util"
+            ],
+            "allowedCommonJsDependencies": [
+              "alasql"
             ]
           },
           "configurations": {
@@ -56,7 +65,15 @@
                   "maximumError": "16kb"
                 }
               ],
-              "outputHashing": "all"
+              "outputHashing": "all",
+              "optimization": {
+                "scripts": true,
+                "styles": {
+                  "minify": true,
+                  "inlineCritical": false
+                },
+                "fonts": false
+              }
             },
             "development": {
               "optimization": false,
@@ -68,12 +85,16 @@
         },
         "serve": {
           "builder": "@angular-devkit/build-angular:dev-server",
+          "options": {
+            "prebundle": false
+          },
           "configurations": {
             "production": {
               "buildTarget": "sql-squad:build:production"
             },
             "development": {
-              "buildTarget": "sql-squad:build:development"
+              "buildTarget": "sql-squad:build:development",
+              "prebundle": false
             }
           },
           "defaultConfiguration": "development"
@@ -100,6 +121,11 @@
                 "glob": "pglite.*",
                 "input": "node_modules/@electric-sql/pglite/dist",
                 "output": "./"
+              },
+              {
+                "glob": "pglite.*",
+                "input": "node_modules/@electric-sql/pglite/dist",
+                "output": "assets"
               }
             ],
             "styles": [

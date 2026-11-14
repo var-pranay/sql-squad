@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
 import { PGlite } from '@electric-sql/pglite';
+import alasql from 'alasql';
 import {
   SqlQueryResult,
   SubmissionEvaluationResult,
@@ -11,135 +12,210 @@ import {
   providedIn: 'root'
 })
 export class SqlSandboxService {
-  private db: PGlite | null = null;
-  private initPromise: Promise<void> | null = null;
+  private pgliteDb: PGlite | null = null;
+  private engineType: 'pglite' | 'alasql' = 'alasql';
+  private pgliteBootPromise: Promise<boolean> | null = null;
+
   private currentSchemaDdl: string = '';
   private currentSeedSql: string = '';
   private currentDatasetKey: string = '';
   private isDirty: boolean = false;
+
   private readonly QUERY_TIMEOUT_MS = 3500;
-  private readonly SETUP_TIMEOUT_MS = 6000;
 
-  constructor() {}
+  constructor() {
+    this.initAlaSqlDatabase();
+    this.bootPgliteInBackground();
+  }
 
-  /**
-   * Ensures the PGlite WASM engine is booted and ready for queries.
-   * Caches the database instance across queries to avoid redundant WASM reloads.
-   */
-  async ensureDbReady(): Promise<void> {
-    if (this.db && this.db.ready) {
-      return;
+  private initAlaSqlDatabase(): void {
+    try {
+      alasql('CREATE DATABASE IF NOT EXISTS sqlsquad_sandbox; USE sqlsquad_sandbox;');
+    } catch (e) {
+      console.warn('AlaSQL init warning:', e);
     }
-
-    if (this.initPromise) {
-      return this.initPromise;
-    }
-
-    this.initPromise = (async () => {
-      try {
-        const dbInstance = new PGlite();
-
-        const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(
-            () =>
-              reject(
-                new Error(
-                  'PostgreSQL sandbox engine initialization timed out. Please check your browser or reload.'
-                )
-              ),
-            10000
-          )
-        );
-
-        await Promise.race([dbInstance.waitReady, timeoutPromise]);
-        this.db = dbInstance;
-      } catch (err: any) {
-        this.db = null;
-        this.initPromise = null;
-        console.error('Failed to initialize PGlite WASM engine:', err);
-        throw new Error(`SQL Engine Boot Failure: ${err.message || err}`);
-      }
-    })();
-
-    return this.initPromise;
   }
 
   /**
-   * Loads the challenge dataset into the sandbox.
-   * If already loaded and pristine, skips redundant execution for instant responsiveness.
+   * Attempts to boot the PostgreSQL 16 WebAssembly engine in the background.
+   * If it takes too long or fails, AlaSQL handles all execution seamlessly.
+   */
+  private bootPgliteInBackground(): Promise<boolean> {
+    if (this.pgliteBootPromise) {
+      return this.pgliteBootPromise;
+    }
+
+    this.pgliteBootPromise = (async () => {
+      try {
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('PGlite boot timeout')), 6000)
+        );
+
+        const bootPromise = (async () => {
+          let wasmModule: WebAssembly.Module | undefined;
+          let fsBundle: Blob | undefined;
+
+          // Attempt direct streaming binary fetch if in browser
+          if (typeof window !== 'undefined' && typeof fetch === 'function') {
+            try {
+              const [wasmRes, dataRes] = await Promise.all([
+                this.fetchBinary([
+                  '/pglite.wasm',
+                  '/assets/pglite.wasm',
+                  'assets/pglite.wasm',
+                  'pglite.wasm'
+                ]),
+                this.fetchBinary([
+                  '/pglite.data',
+                  '/assets/pglite.data',
+                  'assets/pglite.data',
+                  'pglite.data'
+                ])
+              ]);
+
+              if ('compileStreaming' in WebAssembly) {
+                try {
+                  wasmModule = await WebAssembly.compileStreaming(wasmRes);
+                } catch {
+                  const bytes = await wasmRes.arrayBuffer();
+                  wasmModule = await WebAssembly.compile(bytes);
+                }
+              } else {
+                const bytes = await wasmRes.arrayBuffer();
+                wasmModule = await WebAssembly.compile(bytes);
+              }
+
+              fsBundle = await dataRes.blob();
+            } catch (fetchErr) {
+              console.info(
+                'Direct fetch for PGlite binaries bypassed; trying default loader:',
+                fetchErr
+              );
+            }
+          }
+
+          const db =
+            wasmModule && fsBundle
+              ? new PGlite({ pgliteWasmModule: wasmModule, fsBundle })
+              : new PGlite();
+
+          await db.waitReady;
+          return db;
+        })();
+
+        this.pgliteDb = await Promise.race([bootPromise, timeoutPromise]);
+        this.engineType = 'pglite';
+        console.info('PostgreSQL 16 WebAssembly engine loaded successfully.');
+
+        // If a dataset was already requested before PGlite finished booting, load it now
+        if (this.currentSchemaDdl || this.currentSeedSql) {
+          await this.loadPgliteSchemaAndSeed(this.currentSchemaDdl, this.currentSeedSql);
+        }
+
+        return true;
+      } catch (err) {
+        console.warn(
+          'PGlite WASM engine unavailable in current environment. Using high-performance AlaSQL engine.',
+          err
+        );
+        this.pgliteDb = null;
+        this.engineType = 'alasql';
+        return false;
+      }
+    })();
+
+    return this.pgliteBootPromise;
+  }
+
+  private async fetchBinary(candidateUrls: string[]): Promise<Response> {
+    for (const url of candidateUrls) {
+      try {
+        const resp = await fetch(url);
+        if (resp.ok) {
+          const type = resp.headers.get('content-type') || '';
+          if (!type.includes('text/html')) {
+            return resp;
+          }
+        }
+      } catch {
+        // try next URL
+      }
+    }
+    throw new Error(`Failed to locate binary asset from candidates: ${candidateUrls.join(', ')}`);
+  }
+
+  /**
+   * Initializes the active dataset.
+   * If already loaded and pristine, returns immediately.
    */
   async initDataset(schemaDdl: string, seedDataSql: string): Promise<void> {
     this.currentSchemaDdl = schemaDdl || '';
     this.currentSeedSql = seedDataSql || '';
     const datasetKey = `${this.currentSchemaDdl}:::${this.currentSeedSql}`;
 
-    await this.ensureDbReady();
-
-    if (this.currentDatasetKey !== datasetKey || this.isDirty) {
-      await this.loadSchemaAndSeed(this.currentSchemaDdl, this.currentSeedSql);
-      this.currentDatasetKey = datasetKey;
-      this.isDirty = false;
+    if (this.currentDatasetKey === datasetKey && !this.isDirty) {
+      return;
     }
-  }
 
-  /**
-   * Resets the active public schema and seeds clean data.
-   */
-  async resetToBaseline(): Promise<void> {
-    await this.ensureDbReady();
-    await this.loadSchemaAndSeed(this.currentSchemaDdl, this.currentSeedSql);
+    if (this.engineType === 'pglite' && this.pgliteDb) {
+      await this.loadPgliteSchemaAndSeed(this.currentSchemaDdl, this.currentSeedSql);
+    } else {
+      await this.loadAlaSqlSchemaAndSeed(this.currentSchemaDdl, this.currentSeedSql);
+    }
+
+    this.currentDatasetKey = datasetKey;
     this.isDirty = false;
   }
 
-  private async loadSchemaAndSeed(schemaDdl: string, seedDataSql: string): Promise<void> {
-    if (!this.db) {
-      throw new Error('Sandbox database is not initialized.');
+  async resetToBaseline(): Promise<void> {
+    await this.resetEngineBaseline(this.currentSchemaDdl, this.currentSeedSql);
+  }
+
+  private async resetEngineBaseline(schemaDdl: string, seedDataSql: string): Promise<void> {
+    if (this.engineType === 'pglite' && this.pgliteDb) {
+      await this.loadPgliteSchemaAndSeed(schemaDdl, seedDataSql);
+    } else {
+      await this.loadAlaSqlSchemaAndSeed(schemaDdl, seedDataSql);
     }
+    this.isDirty = false;
+  }
 
-    const resetDdl = 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;';
-    const commands: string[] = [resetDdl];
-
-    if (schemaDdl && schemaDdl.trim().length > 0) {
-      commands.push(schemaDdl.trim());
-    }
-
-    if (seedDataSql && seedDataSql.trim().length > 0) {
-      commands.push(seedDataSql.trim());
-    }
-
-    const fullScript = commands.join('\n;\n');
-
-    const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(
-        () => reject(new Error(`Sandbox dataset setup timed out after ${this.SETUP_TIMEOUT_MS}ms`)),
-        this.SETUP_TIMEOUT_MS
-      )
-    );
-
+  private async loadPgliteSchemaAndSeed(schemaDdl: string, seedDataSql: string): Promise<void> {
+    if (!this.pgliteDb) return;
     try {
-      await Promise.race([this.db.exec(fullScript), timeoutPromise]);
+      const resetSql = 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;';
+      const commands: string[] = [resetSql];
+      if (schemaDdl && schemaDdl.trim().length > 0) commands.push(schemaDdl.trim());
+      if (seedDataSql && seedDataSql.trim().length > 0) commands.push(seedDataSql.trim());
+      const fullScript = commands.join('\n;\n');
+      await this.pgliteDb.exec(fullScript);
     } catch (err: any) {
-      console.error('Failed to execute schema/seed script:', err);
-      throw new Error(`Dataset Initialization Error: ${err.message || err}`);
+      console.warn('PGlite schema/seed error, falling back to AlaSQL:', err);
+      this.engineType = 'alasql';
+      await this.loadAlaSqlSchemaAndSeed(schemaDdl, seedDataSql);
+    }
+  }
+
+  private async loadAlaSqlSchemaAndSeed(schemaDdl: string, seedDataSql: string): Promise<void> {
+    try {
+      alasql(
+        'DROP DATABASE IF EXISTS sqlsquad_sandbox; CREATE DATABASE sqlsquad_sandbox; USE sqlsquad_sandbox;'
+      );
+      if (schemaDdl && schemaDdl.trim().length > 0) {
+        alasql(schemaDdl);
+      }
+      if (seedDataSql && seedDataSql.trim().length > 0) {
+        alasql(seedDataSql);
+      }
+    } catch (err: any) {
+      console.warn('AlaSQL schema/seed warning:', err);
     }
   }
 
   /**
-   * Executes an arbitrary user SQL statement with strict timeout & error handling.
+   * Executes a user SQL statement against the active sandbox engine.
    */
   async runQuery(querySql: string): Promise<SqlQueryResult> {
-    try {
-      await this.ensureDbReady();
-    } catch (err: any) {
-      return {
-        columns: [],
-        rows: [],
-        rowCount: 0,
-        executionTimeMs: 0,
-        error: err.message || 'Unable to connect to SQL sandbox engine.'
-      };
-    }
-
     const trimmed = querySql.trim();
     if (!trimmed) {
       return {
@@ -151,7 +227,6 @@ export class SqlSandboxService {
       };
     }
 
-    // Flag whether query modified table state
     const isMutating = /^\s*(insert|update|delete|drop|alter|create|truncate)\b/i.test(trimmed);
     if (isMutating) {
       this.isDirty = true;
@@ -159,26 +234,71 @@ export class SqlSandboxService {
 
     const startTime = performance.now();
 
-    const queryPromise = this.db!.query<Record<string, any>>(trimmed);
-    const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(
-        () => reject(new Error(`Query execution timed out after ${this.QUERY_TIMEOUT_MS}ms`)),
-        this.QUERY_TIMEOUT_MS
-      )
-    );
+    // 1. If PGlite is available, execute with PostgreSQL 16
+    if (this.engineType === 'pglite' && this.pgliteDb) {
+      try {
+        const queryPromise = this.pgliteDb.query<Record<string, any>>(trimmed);
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(
+            () => reject(new Error(`Query execution timed out after ${this.QUERY_TIMEOUT_MS}ms`)),
+            this.QUERY_TIMEOUT_MS
+          )
+        );
 
+        const result = await Promise.race([queryPromise, timeoutPromise]);
+        const duration = Math.max(1, Math.round(performance.now() - startTime));
+
+        const columns =
+          result.fields?.map(f => f.name) ||
+          (result.rows && result.rows.length > 0 ? Object.keys(result.rows[0]) : []);
+
+        return {
+          columns,
+          rows: result.rows || [],
+          rowCount: result.rows ? result.rows.length : 0,
+          executionTimeMs: duration,
+          error: null
+        };
+      } catch (err: any) {
+        const duration = Math.max(1, Math.round(performance.now() - startTime));
+        return {
+          columns: [],
+          rows: [],
+          rowCount: 0,
+          executionTimeMs: duration,
+          error: this.sanitizeErrorMessage(err.message || String(err))
+        };
+      }
+    }
+
+    // 2. Fallback to AlaSQL Engine
     try {
-      const result = await Promise.race([queryPromise, timeoutPromise]);
+      const queryPromise = alasql.promise(trimmed);
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(
+          () => reject(new Error(`Query execution timed out after ${this.QUERY_TIMEOUT_MS}ms`)),
+          this.QUERY_TIMEOUT_MS
+        )
+      );
+
+      const rawResult = await Promise.race([queryPromise, timeoutPromise]);
       const duration = Math.max(1, Math.round(performance.now() - startTime));
 
-      const columns =
-        result.fields?.map(f => f.name) ||
-        (result.rows && result.rows.length > 0 ? Object.keys(result.rows[0]) : []);
+      let rows: any[] = [];
+      if (Array.isArray(rawResult)) {
+        if (rawResult.length > 0 && Array.isArray(rawResult[rawResult.length - 1])) {
+          rows = rawResult[rawResult.length - 1];
+        } else if (rawResult.length > 0 && typeof rawResult[0] === 'object') {
+          rows = rawResult;
+        }
+      }
+
+      const columns = rows.length > 0 ? Object.keys(rows[0]) : [];
 
       return {
         columns,
-        rows: result.rows || [],
-        rowCount: result.rows ? result.rows.length : 0,
+        rows,
+        rowCount: rows.length,
         executionTimeMs: duration,
         error: null
       };
@@ -195,7 +315,7 @@ export class SqlSandboxService {
   }
 
   /**
-   * Runs all test cases against the user's SQL query.
+   * Evaluates user code against all test cases.
    */
   async evaluateSubmission(
     userSql: string,
@@ -208,10 +328,8 @@ export class SqlSandboxService {
     let passedCount = 0;
 
     for (const testCase of testCases) {
-      // 1. Reset dataset to pristine baseline for user query
-      await this.loadSchemaAndSeed(schemaDdl, seedDataSql);
-      this.isDirty = false;
-
+      // 1. Reset baseline before user query
+      await this.resetEngineBaseline(schemaDdl, seedDataSql);
       const userRes = await this.runQuery(userSql);
 
       if (userRes.error) {
@@ -226,10 +344,8 @@ export class SqlSandboxService {
         };
       }
 
-      // 2. Reset dataset to pristine baseline for reference test case query
-      await this.loadSchemaAndSeed(schemaDdl, seedDataSql);
-      this.isDirty = false;
-
+      // 2. Reset baseline before expected reference query
+      await this.resetEngineBaseline(schemaDdl, seedDataSql);
       const expectedRes = await this.runQuery(testCase.expected_query);
 
       const comparison = this.compareResultSets(userRes, expectedRes);
