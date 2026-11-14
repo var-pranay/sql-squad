@@ -16,6 +16,7 @@ import { DifficultyBadgeComponent } from '../../shared/components/badges/difficu
 
 type LeftTab = 'description' | 'schema' | 'hints' | 'submissions';
 type RightTab = 'results' | 'testcases';
+type MobileTab = 'description' | 'editor' | 'results';
 
 @Component({
   selector: 'app-question-workspace',
@@ -41,6 +42,7 @@ type RightTab = 'results' | 'testcases';
           <a routerLink="/questions" class="btn btn-primary">Return to Catalog</a>
         </div>
       } @else {
+        <!-- TOPBAR -->
         <div class="workspace-topbar">
           <div class="topbar-left">
             <a routerLink="/questions" class="btn btn-outline btn-sm back-btn" title="Back to Catalog">
@@ -51,14 +53,16 @@ type RightTab = 'results' | 'testcases';
               Catalog
             </a>
             <h1 class="question-title">{{ question()!.title }}</h1>
-            <app-difficulty-badge [difficulty]="question()!.difficulty"></app-difficulty-badge>
-            <span class="reward-pill">+{{ question()!.points }} XP</span>
+            <div class="badge-group">
+              <app-difficulty-badge [difficulty]="question()!.difficulty"></app-difficulty-badge>
+              <span class="reward-pill">+{{ question()!.points }} XP</span>
+            </div>
           </div>
 
           <div class="topbar-right">
             <button
               type="button"
-              class="btn btn-success"
+              class="btn btn-success submit-btn"
               (click)="submitSolution()"
               [disabled]="isEvaluating() || isRunningQuery()">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -70,6 +74,7 @@ type RightTab = 'results' | 'testcases';
           </div>
         </div>
 
+        <!-- EVALUATION BANNER -->
         @if (evaluationResult()) {
           <div
             class="evaluation-banner"
@@ -79,7 +84,7 @@ type RightTab = 'results' | 'testcases';
             <div class="banner-content">
               @if (evaluationResult()!.status === 'accepted') {
                 <div class="banner-icon-circle success">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
                     <polyline points="20 6 9 17 4 12"/>
                   </svg>
                 </div>
@@ -89,7 +94,7 @@ type RightTab = 'results' | 'testcases';
                 </div>
               } @else {
                 <div class="banner-icon-circle error">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                     <line x1="18" y1="6" x2="6" y2="18"/>
                     <line x1="6" y1="6" x2="18" y2="18"/>
                   </svg>
@@ -100,11 +105,54 @@ type RightTab = 'results' | 'testcases';
                 </div>
               }
             </div>
-            <button type="button" class="btn btn-outline btn-sm" (click)="dismissEvaluationBanner()">Dismiss</button>
+            <button type="button" class="btn btn-outline btn-sm dismiss-btn" (click)="dismissEvaluationBanner()">Dismiss</button>
           </div>
         }
 
-        <div class="workspace-split">
+        <!-- MOBILE SEGMENTED CONTROL TABS -->
+        <div class="mobile-tab-switcher">
+          <button
+            type="button"
+            class="mobile-tab-btn"
+            [class.active]="mobileView() === 'description'"
+            (click)="mobileView.set('description')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+            </svg>
+            Problem
+          </button>
+          <button
+            type="button"
+            class="mobile-tab-btn"
+            [class.active]="mobileView() === 'editor'"
+            (click)="mobileView.set('editor')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="16 18 22 12 16 6"/>
+              <polyline points="8 6 2 12 8 18"/>
+            </svg>
+            SQL Editor
+          </button>
+          <button
+            type="button"
+            class="mobile-tab-btn"
+            [class.active]="mobileView() === 'results'"
+            (click)="mobileView.set('results')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+              <line x1="3" y1="9" x2="21" y2="9"/>
+              <line x1="9" y1="21" x2="9" y2="9"/>
+            </svg>
+            Output & Tests
+            @if (evaluationResult()) {
+              <span class="tab-indicator" [class.pass]="evaluationResult()!.status === 'accepted'" [class.fail]="evaluationResult()!.status !== 'accepted'"></span>
+            }
+          </button>
+        </div>
+
+        <!-- MAIN WORKSPACE SPLIT (Desktop: 2-column, Mobile: Tab-controlled) -->
+        <div class="workspace-split" [class]="'mobile-active-' + mobileView()">
+          <!-- LEFT PANE: Description / Schema / Hints / Submissions -->
           <div class="pane left-pane card">
             <div class="pane-tabs">
               <button
@@ -150,7 +198,7 @@ type RightTab = 'results' | 'testcases';
                     <p>The following tables and columns are pre-loaded in your sandbox environment:</p>
                   </div>
                   <pre class="schema-ddl-code"><code>{{ question()!.dataset?.schema_ddl }}</code></pre>
-                  
+
                   <div class="seed-preview">
                     <h4>Sample Seed Data Preview</h4>
                     <pre class="schema-ddl-code"><code>{{ question()!.dataset?.seed_data_sql }}</code></pre>
@@ -201,6 +249,7 @@ type RightTab = 'results' | 'testcases';
             </div>
           </div>
 
+          <!-- RIGHT PANE: Code Editor (Top) & Output / Test Cases (Bottom) -->
           <div class="pane right-pane">
             <div class="editor-section">
               <app-sql-editor
@@ -212,7 +261,7 @@ type RightTab = 'results' | 'testcases';
             </div>
 
             <div class="console-section card">
-              <div class="pane-tabs">
+              <div class="pane-tabs console-tabs">
                 <button
                   type="button"
                   class="pane-tab"
@@ -271,22 +320,34 @@ type RightTab = 'results' | 'testcases';
     .workspace-page {
       display: flex;
       flex-direction: column;
-      gap: 1rem;
-      height: calc(100vh - 95px);
+      gap: 0.65rem;
+      height: calc(100vh - 84px);
+      max-height: calc(100vh - 84px);
+      overflow: hidden;
+
+      @media (max-width: 900px) {
+        height: calc(100vh - 78px);
+        max-height: calc(100vh - 78px);
+      }
     }
 
     .workspace-topbar {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 1rem;
+      gap: 0.75rem;
       flex-wrap: wrap;
+      flex-shrink: 0;
+
+      @media (max-width: 640px) {
+        gap: 0.4rem;
+      }
     }
 
     .topbar-left {
       display: flex;
       align-items: center;
-      gap: 0.75rem;
+      gap: 0.65rem;
       flex-wrap: wrap;
     }
 
@@ -294,29 +355,53 @@ type RightTab = 'results' | 'testcases';
       display: inline-flex;
       align-items: center;
       gap: 0.35rem;
+      padding: 0.25rem 0.6rem;
+      font-size: 0.775rem;
     }
 
     .question-title {
-      font-size: 1.25rem;
+      font-size: 1.15rem;
       font-weight: 700;
+      margin: 0;
+      letter-spacing: -0.01em;
+
+      @media (max-width: 640px) {
+        font-size: 0.95rem;
+      }
+    }
+
+    .badge-group {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
     }
 
     .reward-pill {
-      font-size: 0.75rem;
+      font-size: 0.725rem;
       font-weight: 700;
       color: var(--accent-warning);
       background-color: var(--accent-warning-subtle);
-      padding: 0.2rem 0.5rem;
+      padding: 0.15rem 0.45rem;
       border-radius: var(--radius-sm);
+    }
+
+    .submit-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.4rem 0.9rem;
+      font-size: 0.85rem;
+      font-weight: 600;
     }
 
     .evaluation-banner {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0.85rem 1.25rem;
+      padding: 0.65rem 1rem;
       border-radius: var(--radius-sm);
-      animation: slideDown 200ms ease;
+      flex-shrink: 0;
+      animation: slideDown 180ms ease;
 
       &.banner-accepted {
         background-color: var(--accent-success-subtle);
@@ -331,16 +416,17 @@ type RightTab = 'results' | 'testcases';
       .banner-content {
         display: flex;
         align-items: center;
-        gap: 0.85rem;
+        gap: 0.75rem;
       }
 
       .banner-icon-circle {
-        width: 32px;
-        height: 32px;
+        width: 28px;
+        height: 28px;
         border-radius: 50%;
         display: flex;
         align-items: center;
         justify-content: center;
+        flex-shrink: 0;
 
         &.success {
           background-color: var(--accent-success);
@@ -355,31 +441,114 @@ type RightTab = 'results' | 'testcases';
 
       .banner-texts {
         h3 {
-          font-size: 0.95rem;
-          margin-bottom: 0.15rem;
+          font-size: 0.875rem;
+          margin: 0 0 0.15rem 0;
         }
         p {
-          font-size: 0.8rem;
+          font-size: 0.775rem;
           color: var(--text-secondary);
+          margin: 0;
         }
+      }
+
+      .dismiss-btn {
+        padding: 0.2rem 0.5rem;
+        font-size: 0.725rem;
       }
     }
 
     @keyframes slideDown {
-      from { transform: translateY(-10px); opacity: 0; }
+      from { transform: translateY(-8px); opacity: 0; }
       to { transform: translateY(0); opacity: 1; }
     }
 
-    .workspace-split {
-      display: grid;
-      grid-template-columns: 45% 55%;
-      gap: 1rem;
-      flex: 1;
-      min-height: 0;
+    /* MOBILE SEGMENTED CONTROL TABS */
+    .mobile-tab-switcher {
+      display: none;
+      background-color: var(--bg-secondary);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 3px;
+      gap: 3px;
+      flex-shrink: 0;
 
       @media (max-width: 1024px) {
-        grid-template-columns: 1fr;
-        height: auto;
+        display: flex;
+      }
+    }
+
+    .mobile-tab-btn {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      font-size: 0.8rem;
+      font-weight: 600;
+      padding: 0.45rem 0.6rem;
+      border-radius: var(--radius-xs);
+      cursor: pointer;
+      transition: all 120ms ease;
+
+      &.active {
+        background-color: var(--bg-primary);
+        color: var(--accent-sky);
+        box-shadow: var(--shadow-sm);
+      }
+    }
+
+    .tab-indicator {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      margin-left: 2px;
+
+      &.pass { background-color: var(--accent-success); }
+      &.fail { background-color: var(--accent-danger); }
+    }
+
+    /* WORKSPACE SPLIT (Desktop: 2 columns, Mobile: Tab views) */
+    .workspace-split {
+      display: grid;
+      grid-template-columns: 46% 54%;
+      gap: 0.75rem;
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+
+      @media (max-width: 1024px) {
+        display: flex;
+        flex-direction: column;
+
+        &.mobile-active-description {
+          .left-pane { display: flex; flex: 1; height: 100%; }
+          .right-pane { display: none; }
+        }
+
+        &.mobile-active-editor {
+          .left-pane { display: none; }
+          .right-pane {
+            display: flex;
+            flex: 1;
+            height: 100%;
+            .editor-section { display: flex; flex: 1; height: 100%; }
+            .console-section { display: none; }
+          }
+        }
+
+        &.mobile-active-results {
+          .left-pane { display: none; }
+          .right-pane {
+            display: flex;
+            flex: 1;
+            height: 100%;
+            .editor-section { display: none; }
+            .console-section { display: flex; flex: 1; height: 100%; }
+          }
+        }
       }
     }
 
@@ -392,6 +561,9 @@ type RightTab = 'results' | 'testcases';
 
     .left-pane {
       background-color: var(--bg-primary);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      overflow: hidden;
     }
 
     .pane-tabs {
@@ -399,12 +571,13 @@ type RightTab = 'results' | 'testcases';
       border-bottom: 1px solid var(--border-subtle);
       background-color: var(--bg-secondary);
       overflow-x: auto;
+      flex-shrink: 0;
     }
 
     .pane-tab {
       background: transparent;
       border: none;
-      padding: 0.65rem 1rem;
+      padding: 0.55rem 0.9rem;
       font-size: 0.8rem;
       font-weight: 600;
       color: var(--text-secondary);
@@ -427,116 +600,139 @@ type RightTab = 'results' | 'testcases';
     .pane-content {
       flex: 1;
       overflow-y: auto;
-      padding: 1.25rem;
+      padding: 1rem 1.25rem;
+      min-height: 0;
     }
 
     .right-pane {
       display: flex;
       flex-direction: column;
-      gap: 0.85rem;
+      gap: 0.65rem;
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
     }
 
     .editor-section {
-      flex: 1.1;
-      min-height: 280px;
+      flex: 55;
+      min-height: 140px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
     }
 
     .console-section {
-      flex: 1;
+      flex: 45;
       display: flex;
       flex-direction: column;
-      min-height: 220px;
+      min-height: 140px;
       overflow: hidden;
+      background-color: var(--bg-primary);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+    }
+
+    .console-tabs {
+      flex-shrink: 0;
+      background-color: var(--bg-secondary);
+      border-bottom: 1px solid var(--border-subtle);
     }
 
     .console-body {
       flex: 1;
+      min-height: 0;
       overflow: hidden;
+      display: flex;
+      flex-direction: column;
     }
 
     .rendered-markdown {
-      font-size: 0.9rem;
-      line-height: 1.65;
+      font-size: 0.875rem;
+      line-height: 1.6;
       color: var(--text-primary);
 
       h3, h4 {
-        margin-top: 1rem;
-        margin-bottom: 0.5rem;
+        margin-top: 0.85rem;
+        margin-bottom: 0.4rem;
+        color: var(--text-primary);
       }
 
       p {
-        margin-bottom: 0.85rem;
+        margin-bottom: 0.75rem;
         color: var(--text-secondary);
       }
 
       ul, ol {
         margin-left: 1.25rem;
-        margin-bottom: 0.85rem;
+        margin-bottom: 0.75rem;
         color: var(--text-secondary);
       }
 
       li {
-        margin-bottom: 0.25rem;
+        margin-bottom: 0.2rem;
       }
 
       code {
         background-color: var(--bg-secondary);
         border: 1px solid var(--border-subtle);
-        padding: 0.15rem 0.4rem;
+        padding: 0.12rem 0.35rem;
         border-radius: var(--radius-xs);
         font-family: var(--font-mono);
-        font-size: 0.825rem;
+        font-size: 0.8rem;
+        color: var(--accent-sky);
       }
     }
 
     .schema-explorer {
       display: flex;
       flex-direction: column;
-      gap: 1rem;
+      gap: 0.85rem;
 
       .schema-intro p {
-        font-size: 0.85rem;
+        font-size: 0.825rem;
         color: var(--text-secondary);
+        margin: 0;
       }
 
       .schema-ddl-code {
         background-color: var(--bg-code);
         border: 1px solid var(--border-subtle);
         border-radius: var(--radius-sm);
-        padding: 1rem;
+        padding: 0.85rem;
         font-family: var(--font-mono);
-        font-size: 0.8rem;
+        font-size: 0.775rem;
         color: var(--text-primary);
         overflow-x: auto;
         white-space: pre-wrap;
       }
 
       .seed-preview h4 {
-        font-size: 0.85rem;
-        margin-bottom: 0.5rem;
+        font-size: 0.825rem;
+        margin-bottom: 0.4rem;
       }
     }
 
     .hints-tab {
       display: flex;
       flex-direction: column;
-      gap: 1rem;
+      gap: 0.85rem;
 
       .hint-card {
-        padding: 1rem;
+        padding: 0.85rem;
         background-color: var(--bg-secondary);
         border: 1px solid var(--border-subtle);
         border-radius: var(--radius-sm);
 
         h4 {
-          font-size: 0.9rem;
-          margin-bottom: 0.4rem;
+          font-size: 0.85rem;
+          margin: 0 0 0.35rem 0;
         }
 
         p {
-          font-size: 0.85rem;
+          font-size: 0.825rem;
           color: var(--text-secondary);
           line-height: 1.5;
+          margin: 0;
         }
       }
     }
@@ -544,11 +740,11 @@ type RightTab = 'results' | 'testcases';
     .submissions-history {
       display: flex;
       flex-direction: column;
-      gap: 0.85rem;
+      gap: 0.75rem;
     }
 
     .past-submission-card {
-      padding: 0.85rem;
+      padding: 0.75rem;
       background-color: var(--bg-secondary);
       border: 1px solid var(--border-subtle);
       border-radius: var(--radius-sm);
@@ -557,11 +753,11 @@ type RightTab = 'results' | 'testcases';
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 0.5rem;
+        margin-bottom: 0.4rem;
       }
 
       .sub-status {
-        font-size: 0.75rem;
+        font-size: 0.725rem;
         font-weight: 700;
         color: var(--accent-danger);
 
@@ -571,54 +767,61 @@ type RightTab = 'results' | 'testcases';
       }
 
       .sub-meta {
-        font-size: 0.725rem;
+        font-size: 0.7rem;
         color: var(--text-muted);
       }
 
       .sub-code {
         background-color: var(--bg-code);
-        padding: 0.65rem;
+        padding: 0.5rem;
         border-radius: var(--radius-xs);
         font-family: var(--font-mono);
-        font-size: 0.775rem;
-        margin-bottom: 0.5rem;
+        font-size: 0.75rem;
+        margin-bottom: 0.4rem;
         overflow-x: auto;
+        white-space: pre-wrap;
+        max-height: 100px;
       }
 
       .restore-btn {
-        font-size: 0.75rem;
-        padding: 0.25rem 0.5rem;
+        font-size: 0.725rem;
+        padding: 0.2rem 0.5rem;
       }
     }
 
     .testcases-view {
-      padding: 1rem;
+      padding: 0.85rem;
       display: flex;
       flex-direction: column;
-      gap: 0.85rem;
+      gap: 0.75rem;
       overflow-y: auto;
+      flex: 1;
+      min-height: 0;
       height: 100%;
     }
 
     .testcase-card {
-      padding: 0.85rem;
+      padding: 0.75rem;
       background-color: var(--bg-secondary);
       border: 1px solid var(--border-subtle);
       border-radius: var(--radius-sm);
+      flex-shrink: 0;
 
       .tc-header {
         display: flex;
         justify-content: space-between;
-        margin-bottom: 0.4rem;
+        align-items: center;
+        margin-bottom: 0.35rem;
       }
 
       .tc-title {
-        font-size: 0.825rem;
+        font-size: 0.8rem;
         font-weight: 600;
+        color: var(--text-primary);
       }
 
       .tc-status {
-        font-size: 0.75rem;
+        font-size: 0.725rem;
         font-weight: 700;
 
         &.passed { color: var(--accent-success); }
@@ -626,7 +829,7 @@ type RightTab = 'results' | 'testcases';
       }
 
       .tc-expected-query {
-        font-size: 0.775rem;
+        font-size: 0.75rem;
         color: var(--text-secondary);
         display: flex;
         flex-direction: column;
@@ -634,19 +837,24 @@ type RightTab = 'results' | 'testcases';
 
         code {
           background-color: var(--bg-code);
-          padding: 0.4rem 0.6rem;
+          padding: 0.45rem 0.65rem;
           border-radius: var(--radius-xs);
           font-family: var(--font-mono);
           color: var(--text-primary);
+          white-space: pre-wrap;
+          word-break: break-word;
+          max-height: 130px;
+          overflow-y: auto;
+          display: block;
         }
       }
 
       .tc-diff-alert {
-        margin-top: 0.5rem;
-        padding: 0.5rem 0.75rem;
+        margin-top: 0.4rem;
+        padding: 0.45rem 0.65rem;
         background-color: var(--accent-danger-subtle);
         color: var(--accent-danger);
-        font-size: 0.775rem;
+        font-size: 0.75rem;
         border-radius: var(--radius-xs);
       }
     }
@@ -673,6 +881,7 @@ export class QuestionWorkspaceComponent implements OnInit {
 
   activeLeftTab = signal<LeftTab>('description');
   activeRightTab = signal<RightTab>('results');
+  mobileView = signal<MobileTab>('description');
 
   isRunningQuery = signal<boolean>(false);
   isEvaluating = signal<boolean>(false);
@@ -694,7 +903,10 @@ export class QuestionWorkspaceComponent implements OnInit {
     this.isLoadingQuestion.set(false);
 
     if (q && q.dataset) {
-      await this.sandbox.initDataset(q.dataset.schema_ddl, q.dataset.seed_data_sql);
+      // Warm up dataset in background
+      this.sandbox.initDataset(q.dataset.schema_ddl, q.dataset.seed_data_sql).catch(err => {
+        console.warn('Sandbox init warning:', err);
+      });
 
       const userId = this.auth.currentUser()?.id || 'demo-user-1';
       const subs = await this.dataService.getUserSubmissions(userId, q.id);
@@ -703,7 +915,10 @@ export class QuestionWorkspaceComponent implements OnInit {
       if (subs.length > 0) {
         this.userCode = subs[0].query_sql;
       } else {
-        this.userCode = `-- SQL Squad Challenge: ${q.title}\n-- Dialect: PostgreSQL 16\n\nSELECT * FROM customers LIMIT 5;\n`;
+        // Automatically determine first table name from dataset schema DDL
+        const match = q.dataset.schema_ddl.match(/CREATE\s+TABLE\s+(\w+)/i);
+        const firstTable = match ? match[1] : 'my_table';
+        this.userCode = `-- SQL Squad Challenge: ${q.title}\n-- Dialect: PostgreSQL 16\n\nSELECT * FROM ${firstTable} LIMIT 10;\n`;
       }
     }
   }
@@ -717,6 +932,11 @@ export class QuestionWorkspaceComponent implements OnInit {
 
     this.isRunningQuery.set(true);
     this.activeRightTab.set('results');
+
+    // On mobile devices, automatically switch to results tab so output is instantly visible
+    if (typeof window !== 'undefined' && window.innerWidth <= 1024) {
+      this.mobileView.set('results');
+    }
 
     try {
       await this.sandbox.initDataset(
@@ -744,6 +964,11 @@ export class QuestionWorkspaceComponent implements OnInit {
     if (!q || !q.dataset) return;
 
     this.isEvaluating.set(true);
+
+    // On mobile devices, switch to results/tests tab
+    if (typeof window !== 'undefined' && window.innerWidth <= 1024) {
+      this.mobileView.set('results');
+    }
 
     try {
       const evaluation = await this.sandbox.evaluateSubmission(
@@ -785,7 +1010,7 @@ export class QuestionWorkspaceComponent implements OnInit {
     switch (status) {
       case 'wrong_answer': return 'Wrong Answer';
       case 'runtime_error': return 'Runtime Error';
-      case 'time_limit_exceeded': return 'Time Limit Exceeded (3.0s)';
+      case 'time_limit_exceeded': return 'Time Limit Exceeded (3.5s)';
       default: return 'Submission Result';
     }
   }
@@ -796,6 +1021,8 @@ export class QuestionWorkspaceComponent implements OnInit {
 
   restoreQuery(code: string): void {
     this.userCode = code;
+    // On mobile, switch back to editor so user sees their restored code
+    this.mobileView.set('editor');
   }
 
   formatMarkdown(markdown: string): string {

@@ -100,6 +100,10 @@ import { ThemeService } from '../../../core/services/theme.service';
       font-size: 0.75rem;
       color: var(--text-muted);
 
+      @media (max-width: 768px) {
+        display: none;
+      }
+
       kbd {
         background-color: var(--bg-secondary);
         border: 1px solid var(--border-medium);
@@ -118,7 +122,7 @@ import { ThemeService } from '../../../core/services/theme.service';
     .editor-container {
       flex: 1;
       height: 100%;
-      min-height: 240px;
+      min-height: 0;
       overflow: auto;
     }
   `]

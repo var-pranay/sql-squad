@@ -110,6 +110,9 @@ import { StreakBadgeComponent } from '../badges/streak-badge.component';
       </header>
 
       <div class="app-body">
+        @if (sidebarOpen()) {
+          <div class="sidebar-backdrop" (click)="closeMobileSidebar()"></div>
+        }
         <aside class="app-sidebar" [class.mobile-open]="sidebarOpen()">
           <div class="sidebar-section">
             <span class="sidebar-heading">Practice</span>
@@ -441,9 +444,23 @@ import { StreakBadgeComponent } from '../badges/streak-badge.component';
       }
     }
 
+    .sidebar-backdrop {
+      display: none;
+      @media (max-width: 900px) {
+        display: block;
+        position: fixed;
+        inset: 0;
+        top: 60px;
+        background-color: rgba(0, 0, 0, 0.65);
+        backdrop-filter: blur(2px);
+        z-index: 25;
+      }
+    }
+
     .app-body {
       display: flex;
       flex: 1;
+      min-height: calc(100vh - 60px);
     }
 
     .app-sidebar {
@@ -532,14 +549,20 @@ import { StreakBadgeComponent } from '../badges/streak-badge.component';
 
     .app-content {
       flex: 1;
-      padding: 1.75rem;
-      max-width: 1440px;
+      padding: 0.85rem 1.25rem;
+      max-width: 1600px;
       width: 100%;
       margin: 0 auto;
       overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+
+      @media (max-width: 900px) {
+        padding: 0.65rem 0.75rem;
+      }
 
       @media (max-width: 600px) {
-        padding: 1rem;
+        padding: 0.5rem;
       }
     }
   `]

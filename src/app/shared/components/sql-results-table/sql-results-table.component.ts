@@ -157,13 +157,45 @@ import { SqlQueryResult } from '../../../core/models/database.types';
     .results-body {
       flex: 1;
       overflow: auto;
-      min-height: 160px;
+      min-height: 0;
       position: relative;
     }
 
     .table-container {
       width: 100%;
-      overflow-x: auto;
+      height: 100%;
+      overflow: auto;
+    }
+
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.825rem;
+
+      thead th {
+        position: sticky;
+        top: 0;
+        background-color: var(--bg-secondary);
+        z-index: 2;
+        padding: 0.55rem 0.75rem;
+        text-align: left;
+        font-weight: 600;
+        color: var(--text-secondary);
+        border-bottom: 1px solid var(--border-medium);
+        white-space: nowrap;
+      }
+
+      tbody td {
+        padding: 0.45rem 0.75rem;
+        border-bottom: 1px solid var(--border-subtle);
+        color: var(--text-primary);
+        font-family: var(--font-mono);
+        white-space: nowrap;
+      }
+
+      tbody tr:hover {
+        background-color: var(--bg-hover);
+      }
     }
 
     .row-num-col {
@@ -179,10 +211,11 @@ import { SqlQueryResult } from '../../../core/models/database.types';
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 2.5rem 1.5rem;
+      padding: 1.5rem 1rem;
       color: var(--text-secondary);
       text-align: center;
-      gap: 0.75rem;
+      gap: 0.6rem;
+      height: 100%;
 
       svg {
         color: var(--text-muted);
