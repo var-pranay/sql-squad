@@ -280,7 +280,7 @@ import { ThemeService } from '../../../core/services/theme.service';
   `]
 })
 export class SqlEditorComponent implements AfterViewInit, OnDestroy, OnChanges {
-  @ViewChild('editorHost', { static: true }) editorHost!: ElementRef<HTMLDivElement>;
+  @ViewChild('editorHost', { static: false }) editorHost!: ElementRef<HTMLDivElement>;
 
   @Input() initialCode: string = '-- Write your PostgreSQL query here\n';
   @Input() starterCode: string = '';
@@ -300,6 +300,20 @@ export class SqlEditorComponent implements AfterViewInit, OnDestroy, OnChanges {
 
   ngAfterViewInit(): void {
     this.initCodeMirror();
+  }
+
+  refreshView(): void {
+    if (this.editorView) {
+      const current = this.editorView.state.doc.toString();
+      if (this.initialCode && current !== this.initialCode) {
+        this.editorView.dispatch({
+          changes: { from: 0, to: current.length, insert: this.initialCode }
+        });
+      }
+      this.editorView.requestMeasure();
+    } else if (this.editorHost?.nativeElement) {
+      this.initCodeMirror();
+    }
   }
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -322,6 +336,12 @@ export class SqlEditorComponent implements AfterViewInit, OnDestroy, OnChanges {
   }
 
   private initCodeMirror(): void {
+    if (!this.editorHost?.nativeElement) return;
+    if (this.editorView) {
+      this.editorView.destroy();
+      this.editorView = null;
+    }
+
     const runKeymap = keymap.of([
       {
         key: 'Ctrl-Enter',

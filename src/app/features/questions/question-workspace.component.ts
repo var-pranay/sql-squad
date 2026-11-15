@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, ViewChild, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterModule } from '@angular/router';
 import { DataService } from '../../core/services/data.service';
@@ -51,7 +51,7 @@ type RightPaneViewMode = 'editor' | 'output';
                 <line x1="19" y1="12" x2="5" y2="12"/>
                 <polyline points="12 19 5 12 12 5"/>
               </svg>
-              <span>Catalog</span>
+              <span class="back-btn-text">Catalog</span>
             </a>
 
             <div class="topbar-desktop-title">
@@ -73,19 +73,22 @@ type RightPaneViewMode = 'editor' | 'output';
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
                   <polygon points="5 3 19 12 5 21 5 3"/>
                 </svg>
-                <span>{{ isRunningQuery() ? 'Running...' : 'Run Query' }}</span>
+                <span class="btn-text-full">{{ isRunningQuery() ? 'Running...' : 'Run Query' }}</span>
+                <span class="btn-text-short">{{ isRunningQuery() ? '...' : 'Run' }}</span>
               </button>
 
               <button
                 type="button"
                 class="btn btn-success submit-btn"
                 (click)="submitSolution()"
-                [disabled]="isEvaluating() || isRunningQuery()">
+                [disabled]="isEvaluating() || isRunningQuery()"
+                title="Submit Solution">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                   <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
                   <polyline points="22 4 12 14.01 9 11.01"/>
                 </svg>
-                <span>{{ isEvaluating() ? 'Evaluating...' : 'Submit Solution' }}</span>
+                <span class="btn-text-full">{{ isEvaluating() ? 'Evaluating...' : 'Submit Solution' }}</span>
+                <span class="btn-text-short">{{ isEvaluating() ? '...' : 'Submit' }}</span>
               </button>
             </div>
           </div>
@@ -136,7 +139,7 @@ type RightPaneViewMode = 'editor' | 'output';
             type="button"
             class="mobile-tab-btn"
             [class.active]="mobileView() === 'description'"
-            (click)="mobileView.set('description')">
+            (click)="setMobileTab('description')">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
               <polyline points="14 2 14 8 20 8"/>
@@ -147,7 +150,7 @@ type RightPaneViewMode = 'editor' | 'output';
             type="button"
             class="mobile-tab-btn"
             [class.active]="mobileView() === 'editor'"
-            (click)="mobileView.set('editor')">
+            (click)="setMobileTab('editor')">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="16 18 22 12 16 6"/>
               <polyline points="8 6 2 12 8 18"/>
@@ -158,7 +161,7 @@ type RightPaneViewMode = 'editor' | 'output';
             type="button"
             class="mobile-tab-btn"
             [class.active]="mobileView() === 'results'"
-            (click)="mobileView.set('results')">
+            (click)="setMobileTab('results')">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
               <line x1="3" y1="9" x2="21" y2="9"/>
@@ -350,97 +353,96 @@ type RightPaneViewMode = 'editor' | 'output';
               </button>
             </div>
 
-            @if (rightPaneMode() === 'editor') {
-              <div class="editor-section">
-                <app-sql-editor
-                  [initialCode]="userCode"
-                  [starterCode]="starterTemplateCode()"
-                  [isRunning]="isRunningQuery()"
-                  (codeChange)="onCodeChange($event)"
-                  (runRequested)="runQuery($event)"
-                  (resetRequested)="onResetEditor()">
-                </app-sql-editor>
-              </div>
-            } @else {
-              <div class="console-section">
-                <div class="console-sub-bar">
-                  <div class="console-tabs-left">
-                    <button
-                      type="button"
-                      class="sub-tab-btn"
-                      [class.active]="activeRightTab() === 'results'"
-                      (click)="activeRightTab.set('results')">
-                      Query Output
-                    </button>
-                    <button
-                      type="button"
-                      class="sub-tab-btn"
-                      [class.active]="activeRightTab() === 'testcases'"
-                      (click)="activeRightTab.set('testcases')">
-                      Test Cases ({{ question()!.test_cases?.length || 0 }})
-                    </button>
-                  </div>
+            <div class="editor-section" [class.hidden-pane]="rightPaneMode() !== 'editor'">
+              <app-sql-editor
+                #sqlEditor
+                [initialCode]="userCode"
+                [starterCode]="starterTemplateCode()"
+                [isRunning]="isRunningQuery()"
+                (codeChange)="onCodeChange($event)"
+                (runRequested)="runQuery($event)"
+                (resetRequested)="onResetEditor()">
+              </app-sql-editor>
+            </div>
+
+            <div class="console-section" [class.hidden-pane]="rightPaneMode() !== 'output'">
+              <div class="console-sub-bar">
+                <div class="console-tabs-left">
                   <button
                     type="button"
-                    class="btn btn-outline btn-xs back-to-editor-btn"
-                    (click)="setRightPaneMode('editor')"
-                    title="Switch back to SQL Editor">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <polyline points="15 18 9 12 15 6"/>
-                    </svg>
-                    <span>Back to Editor</span>
+                    class="sub-tab-btn"
+                    [class.active]="activeRightTab() === 'results'"
+                    (click)="activeRightTab.set('results')">
+                    Query Output
+                  </button>
+                  <button
+                    type="button"
+                    class="sub-tab-btn"
+                    [class.active]="activeRightTab() === 'testcases'"
+                    (click)="activeRightTab.set('testcases')">
+                    Test Cases ({{ question()!.test_cases?.length || 0 }})
                   </button>
                 </div>
+                <button
+                  type="button"
+                  class="btn btn-outline btn-xs back-to-editor-btn"
+                  (click)="setRightPaneMode('editor')"
+                  title="Switch back to SQL Editor">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="15 18 9 12 15 6"/>
+                  </svg>
+                  <span>Back to Editor</span>
+                </button>
+              </div>
 
-                <div class="console-body">
-                  @if (activeRightTab() === 'results') {
-                    <app-sql-results-table
-                      [result]="queryResult()"
-                      [isLoading]="isRunningQuery()">
-                    </app-sql-results-table>
-                  } @else if (activeRightTab() === 'testcases') {
-                    <div class="testcases-view">
-                      @for (tc of question()!.test_cases; track tc.id; let idx = $index) {
-                        <div class="testcase-card">
-                          <div class="tc-header">
-                            <span class="tc-title">Test Case {{ idx + 1 }}: {{ tc.test_name }}</span>
-                            @if (getTestCaseResult(tc.id); as result) {
-                              <span class="tc-status" [class.passed]="result.passed" [class.failed]="!result.passed">
-                                {{ result.passed ? 'Passed' : 'Failed' }}
-                              </span>
-                            }
-                          </div>
-                          <div class="tc-expected-query">
-                            <div class="tc-expected-header">
-                              <span class="tc-label">Reference Query:</span>
-                              <button
-                                type="button"
-                                class="btn btn-outline btn-xs copy-btn"
-                                (click)="copyText(tc.expected_query, 'tc-' + tc.id)"
-                                title="Copy Reference Query">
-                                @if (copiedKey() === 'tc-' + tc.id) {
-                                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-                                  <span class="text-success">Copied!</span>
-                                } @else {
-                                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                                  <span>Copy</span>
-                                }
-                              </button>
-                            </div>
-                            <pre class="tc-code"><code>{{ tc.expected_query }}</code></pre>
-                          </div>
-                          @if (getTestCaseResult(tc.id)?.diffMessage; as diff) {
-                            <div class="tc-diff-alert">
-                              {{ diff }}
-                            </div>
+              <div class="console-body">
+                @if (activeRightTab() === 'results') {
+                  <app-sql-results-table
+                    [result]="queryResult()"
+                    [isLoading]="isRunningQuery()">
+                  </app-sql-results-table>
+                } @else if (activeRightTab() === 'testcases') {
+                  <div class="testcases-view">
+                    @for (tc of question()!.test_cases; track tc.id; let idx = $index) {
+                      <div class="testcase-card">
+                        <div class="tc-header">
+                          <span class="tc-title">Test Case {{ idx + 1 }}: {{ tc.test_name }}</span>
+                          @if (getTestCaseResult(tc.id); as result) {
+                            <span class="tc-status" [class.passed]="result.passed" [class.failed]="!result.passed">
+                              {{ result.passed ? 'Passed' : 'Failed' }}
+                            </span>
                           }
                         </div>
-                      }
-                    </div>
-                  }
-                </div>
+                        <div class="tc-expected-query">
+                          <div class="tc-expected-header">
+                            <span class="tc-label">Reference Query:</span>
+                            <button
+                              type="button"
+                              class="btn btn-outline btn-xs copy-btn"
+                              (click)="copyText(tc.expected_query, 'tc-' + tc.id)"
+                              title="Copy Reference Query">
+                              @if (copiedKey() === 'tc-' + tc.id) {
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                                <span class="text-success">Copied!</span>
+                              } @else {
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                <span>Copy</span>
+                              }
+                            </button>
+                          </div>
+                          <pre class="tc-code"><code>{{ tc.expected_query }}</code></pre>
+                        </div>
+                        @if (getTestCaseResult(tc.id)?.diffMessage; as diff) {
+                          <div class="tc-diff-alert">
+                            {{ diff }}
+                          </div>
+                        }
+                      </div>
+                    }
+                  </div>
+                }
               </div>
-            }
+            </div>
           </div>
         </div>
       }
@@ -553,6 +555,13 @@ type RightPaneViewMode = 'editor' | 'output';
       padding: 0.25rem 0.6rem;
       font-size: 0.775rem;
       flex-shrink: 0;
+
+      @media (max-width: 680px) {
+        padding: 0.25rem 0.45rem;
+        .back-btn-text {
+          display: none;
+        }
+      }
     }
 
     .topbar-actions-group {
@@ -560,6 +569,13 @@ type RightPaneViewMode = 'editor' | 'output';
       align-items: center;
       gap: 0.45rem;
       flex-shrink: 0;
+    }
+
+    .btn-text-short {
+      display: none;
+    }
+    .btn-text-full {
+      display: inline;
     }
 
     .topbar-run-btn {
@@ -570,11 +586,6 @@ type RightPaneViewMode = 'editor' | 'output';
       font-size: 0.8rem;
       font-weight: 700;
       flex-shrink: 0;
-
-      @media (max-width: 480px) {
-        padding: 0.3rem 0.5rem;
-        font-size: 0.75rem;
-      }
     }
 
     .submit-btn {
@@ -585,10 +596,35 @@ type RightPaneViewMode = 'editor' | 'output';
       font-size: 0.8rem;
       font-weight: 600;
       flex-shrink: 0;
+    }
 
-      @media (max-width: 480px) {
-        padding: 0.3rem 0.55rem;
+    @media (max-width: 680px) {
+      .btn-text-full {
+        display: none !important;
+      }
+      .btn-text-short {
+        display: inline !important;
+      }
+
+      .topbar-actions-group {
+        gap: 0.3rem;
+      }
+
+      .topbar-run-btn, .submit-btn {
+        padding: 0.3rem 0.5rem;
         font-size: 0.75rem;
+      }
+    }
+
+    @media (max-width: 380px) {
+      .topbar-run-btn, .submit-btn {
+        padding: 0.25rem 0.4rem;
+        font-size: 0.72rem;
+        gap: 0.2rem;
+      }
+
+      .badge-group {
+        gap: 0.25rem;
       }
     }
 
@@ -854,6 +890,10 @@ type RightPaneViewMode = 'editor' | 'output';
         flex-direction: column;
         overflow: hidden;
 
+        &.hidden-pane {
+          display: none !important;
+        }
+
         > app-sql-editor {
           flex: 1 1 0;
           height: 100%;
@@ -872,6 +912,10 @@ type RightPaneViewMode = 'editor' | 'output';
         display: flex;
         flex-direction: column;
         overflow: hidden;
+
+        &.hidden-pane {
+          display: none !important;
+        }
       }
     }
 
@@ -1238,6 +1282,8 @@ type RightPaneViewMode = 'editor' | 'output';
   `]
 })
 export class QuestionWorkspaceComponent implements OnInit {
+  @ViewChild('sqlEditor') sqlEditor?: SqlEditorComponent;
+
   private route = inject(ActivatedRoute);
   private dataService = inject(DataService);
   private auth = inject(AuthService);
@@ -1303,6 +1349,22 @@ export class QuestionWorkspaceComponent implements OnInit {
 
   setRightPaneMode(mode: RightPaneViewMode): void {
     this.rightPaneMode.set(mode);
+    if (mode === 'editor') {
+      this.mobileView.set('editor');
+      setTimeout(() => this.sqlEditor?.refreshView(), 50);
+    } else {
+      this.mobileView.set('results');
+    }
+  }
+
+  setMobileTab(tab: MobileTab): void {
+    this.mobileView.set(tab);
+    if (tab === 'editor') {
+      this.rightPaneMode.set('editor');
+      setTimeout(() => this.sqlEditor?.refreshView(), 50);
+    } else if (tab === 'results') {
+      this.rightPaneMode.set('output');
+    }
   }
 
   async runQuery(sqlQuery: string): Promise<void> {
@@ -1310,12 +1372,7 @@ export class QuestionWorkspaceComponent implements OnInit {
 
     this.isRunningQuery.set(true);
     this.activeRightTab.set('results');
-    this.rightPaneMode.set('output');
-
-    // On mobile devices, automatically switch to results tab so output is instantly visible
-    if (typeof window !== 'undefined' && window.innerWidth <= 1024) {
-      this.mobileView.set('results');
-    }
+    this.setRightPaneMode('output');
 
     try {
       await this.sandbox.initDataset(
@@ -1344,12 +1401,7 @@ export class QuestionWorkspaceComponent implements OnInit {
 
     this.isEvaluating.set(true);
     this.activeRightTab.set('testcases');
-    this.rightPaneMode.set('output');
-
-    // On mobile devices, switch to results/tests tab
-    if (typeof window !== 'undefined' && window.innerWidth <= 1024) {
-      this.mobileView.set('results');
-    }
+    this.setRightPaneMode('output');
 
     try {
       const evaluation = await this.sandbox.evaluateSubmission(
@@ -1402,8 +1454,7 @@ export class QuestionWorkspaceComponent implements OnInit {
 
   restoreQuery(code: string): void {
     this.userCode = code;
-    // On mobile, switch back to editor so user sees their restored code
-    this.mobileView.set('editor');
+    this.setRightPaneMode('editor');
   }
 
   onResetEditor(): void {
