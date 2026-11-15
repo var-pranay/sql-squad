@@ -2,6 +2,7 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
+import { DataService } from '../../core/services/data.service';
 import { AppRole } from '../../core/models/database.types';
 
 interface ManagedUser {
@@ -141,47 +142,32 @@ interface ManagedUser {
 })
 export class AdminUsersComponent implements OnInit {
   private auth = inject(AuthService);
+  private dataService = inject(DataService);
 
-  users = signal<ManagedUser[]>([
-    {
-      id: 'demo-admin-1',
-      username: 'admin_boss',
-      email: 'admin@sqlsquad.dev',
-      role: 'admin',
-      current_streak: 12,
-      total_solved: 54,
-      created_at: 'Jan 2026'
-    },
-    {
-      id: 'demo-user-1',
-      username: 'alex_codes',
-      email: 'alex@sqlsquad.dev',
-      role: 'user',
-      current_streak: 4,
-      total_solved: 25,
-      created_at: 'Feb 2026'
-    },
-    {
-      id: 'user-2',
-      username: 'query_ninja',
-      email: 'ninja@sqlsquad.dev',
-      role: 'user',
-      current_streak: 15,
-      total_solved: 48,
-      created_at: 'Feb 2026'
-    },
-    {
-      id: 'user-3',
-      username: 'sql_samurai',
-      email: 'samurai@sqlsquad.dev',
-      role: 'user',
-      current_streak: 9,
-      total_solved: 39,
-      created_at: 'Mar 2026'
+  users = signal<ManagedUser[]>([]);
+
+  async ngOnInit(): Promise<void> {
+    const list = await this.dataService.getAdminUsers();
+    if (list.length > 0) {
+      this.users.set(list);
+    } else {
+      // Fallback to active logged in admin
+      const current = this.auth.currentUser();
+      if (current) {
+        this.users.set([
+          {
+            id: current.id,
+            username: current.username,
+            email: current.email,
+            role: current.role,
+            current_streak: current.profile?.current_streak || 0,
+            total_solved: 0,
+            created_at: 'Active Now'
+          }
+        ]);
+      }
     }
-  ]);
-
-  ngOnInit(): void {}
+  }
 
   toggleRole(user: ManagedUser): void {
     const nextRole: AppRole = user.role === 'admin' ? 'user' : 'admin';

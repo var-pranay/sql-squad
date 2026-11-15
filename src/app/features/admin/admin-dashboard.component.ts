@@ -30,8 +30,8 @@ import { MetricCardComponent } from '../../shared/components/cards/metric-card.c
       <div class="metrics-grid">
         <app-metric-card
           title="Total Registered Users"
-          value="1,420"
-          subtext="+18% this month"
+          [value]="metrics().totalUsers"
+          subtext="Active practitioners in Supabase"
           iconColor="emerald">
           <svg icon width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
@@ -43,8 +43,8 @@ import { MetricCardComponent } from '../../shared/components/cards/metric-card.c
 
         <app-metric-card
           title="Total Questions"
-          [value]="questions().length"
-          [subtext]="publishedCount() + ' Published, ' + draftCount() + ' Drafts'"
+          [value]="metrics().totalQuestions"
+          [subtext]="metrics().publishedQuestions + ' Published, ' + metrics().draftQuestions + ' Drafts'"
           iconColor="sky">
           <svg icon width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
@@ -56,7 +56,7 @@ import { MetricCardComponent } from '../../shared/components/cards/metric-card.c
 
         <app-metric-card
           title="Total Submissions"
-          [value]="submissions().length > 0 ? submissions().length : 384"
+          [value]="metrics().totalSubmissions"
           subtext="Processed in sandbox"
           iconColor="amber">
           <svg icon width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -66,7 +66,7 @@ import { MetricCardComponent } from '../../shared/components/cards/metric-card.c
 
         <app-metric-card
           title="Pass Rate"
-          value="68.4%"
+          [value]="metrics().passRate"
           subtext="Accepted solutions"
           iconColor="orange">
           <svg icon width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -103,12 +103,12 @@ import { MetricCardComponent } from '../../shared/components/cards/metric-card.c
             <span class="badge">Live</span>
           </div>
           <div class="card-body stream-list">
-            @if (submissions().length === 0) {
+            @if (metrics().recentSubmissions.length === 0) {
               <div class="stream-empty">
-                <p>Simulating sandbox query executions.</p>
+                <p>No query executions recorded yet. Solve questions in catalog to see live activity!</p>
               </div>
             } @else {
-              @for (sub of submissions().slice(0, 6); track sub.id) {
+              @for (sub of metrics().recentSubmissions.slice(0, 6); track sub.id) {
                 <div class="stream-row">
                   <div class="stream-indicator" [class.success]="sub.status === 'accepted'" [class.fail]="sub.status !== 'accepted'"></div>
                   <div class="stream-content">
@@ -243,18 +243,34 @@ export class AdminDashboardComponent implements OnInit {
   private dataService = inject(DataService);
 
   questions = signal<Question[]>([]);
-  submissions = signal<Submission[]>([]);
+  metrics = signal<{
+    totalUsers: number;
+    totalQuestions: number;
+    publishedQuestions: number;
+    draftQuestions: number;
+    totalSubmissions: number;
+    passRate: string;
+    recentSubmissions: Submission[];
+  }>({
+    totalUsers: 1,
+    totalQuestions: 0,
+    publishedQuestions: 0,
+    draftQuestions: 0,
+    totalSubmissions: 0,
+    passRate: '0%',
+    recentSubmissions: []
+  });
 
   publishedCount = computed(() => this.questions().filter(q => q.status === 'published').length);
   draftCount = computed(() => this.questions().filter(q => q.status === 'draft').length);
 
   async ngOnInit(): Promise<void> {
-    const [qList, subList] = await Promise.all([
+    const [qList, m] = await Promise.all([
       this.dataService.getQuestions(),
-      this.dataService.getUserSubmissions('demo-user-1')
+      this.dataService.getAdminMetrics()
     ]);
     this.questions.set(qList);
-    this.submissions.set(subList);
+    this.metrics.set(m);
   }
 
   formatTime(isoStr: string): string {

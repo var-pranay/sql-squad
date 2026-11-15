@@ -235,10 +235,129 @@ export class DataService {
   }
 
   async getUserSubmissions(userId: string, questionId?: string): Promise<Submission[]> {
+    if (!this.supabase.isDemoMode && this.supabase.clientInstance) {
+      try {
+        let q = this.supabase.clientInstance
+          .from('submissions')
+          .select('*')
+          .eq('user_id', userId)
+          .order('submitted_at', { ascending: false });
+        if (questionId) {
+          q = q.eq('question_id', questionId);
+        }
+        const { data, error } = await q;
+        if (!error && data) {
+          return data;
+        }
+      } catch (err) {
+        console.warn('Error fetching submissions from Supabase:', err);
+      }
+    }
     const all = this.getLocal<Submission[]>(this.STORAGE_SUBMISSIONS_KEY, []);
     return all.filter(
       s => s.user_id === userId && (!questionId || s.question_id === questionId)
     );
+  }
+
+  async getAdminMetrics(): Promise<{
+    totalUsers: number;
+    totalQuestions: number;
+    publishedQuestions: number;
+    draftQuestions: number;
+    totalSubmissions: number;
+    passRate: string;
+    recentSubmissions: Submission[];
+  }> {
+    let totalUsers = 1;
+    const questions = await this.getQuestions();
+    const publishedQuestions = questions.filter(q => q.status === 'published').length;
+    const draftQuestions = questions.filter(q => q.status === 'draft').length;
+    let totalSubmissions = 0;
+    let passRate = '0%';
+    let recentSubmissions: Submission[] = [];
+
+    if (!this.supabase.isDemoMode && this.supabase.clientInstance) {
+      try {
+        const { count: userCount } = await this.supabase.clientInstance
+          .from('profiles')
+          .select('*', { count: 'exact', head: true });
+        if (userCount !== null && userCount !== undefined && userCount > 0) {
+          totalUsers = userCount;
+        }
+
+        const { data: subData, count: subCount } = await this.supabase.clientInstance
+          .from('submissions')
+          .select('*', { count: 'exact' })
+          .order('submitted_at', { ascending: false })
+          .limit(10);
+
+        if (subCount !== null && subCount !== undefined) {
+          totalSubmissions = subCount;
+        } else if (subData) {
+          totalSubmissions = subData.length;
+        }
+
+        if (subData && subData.length > 0) {
+          recentSubmissions = subData;
+          const accepted = subData.filter(s => s.status === 'accepted').length;
+          passRate = `${Math.round((accepted / subData.length) * 100)}%`;
+        }
+      } catch (err) {
+        console.warn('Supabase admin metrics error:', err);
+      }
+    }
+
+    if (totalSubmissions === 0) {
+      const localSubs = this.getLocal<Submission[]>(this.STORAGE_SUBMISSIONS_KEY, []);
+      if (localSubs.length > 0) {
+        totalSubmissions = localSubs.length;
+        recentSubmissions = localSubs.slice(0, 10);
+        const accepted = localSubs.filter(s => s.status === 'accepted').length;
+        passRate = `${Math.round((accepted / localSubs.length) * 100)}%`;
+      }
+    }
+
+    return {
+      totalUsers,
+      totalQuestions: questions.length,
+      publishedQuestions,
+      draftQuestions,
+      totalSubmissions,
+      passRate: totalSubmissions > 0 ? passRate : '100%',
+      recentSubmissions
+    };
+  }
+
+  async getAdminUsers(): Promise<any[]> {
+    if (!this.supabase.isDemoMode && this.supabase.clientInstance) {
+      try {
+        const { data, error } = await this.supabase.clientInstance
+          .from('profiles')
+          .select(`
+            id,
+            username,
+            full_name,
+            current_streak,
+            created_at,
+            user_roles ( role )
+          `);
+
+        if (!error && data && data.length > 0) {
+          return data.map((u: any) => ({
+            id: u.id,
+            username: u.username || 'user',
+            email: u.username ? `${u.username}@sqlsquad.dev` : 'user@sqlsquad.dev',
+            role: u.user_roles && u.user_roles.length > 0 ? u.user_roles[0].role : 'user',
+            current_streak: u.current_streak || 0,
+            total_solved: 0,
+            created_at: u.created_at ? new Date(u.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recently'
+          }));
+        }
+      } catch (err) {
+        console.warn('Error fetching admin users:', err);
+      }
+    }
+    return [];
   }
 
   async getUserProgress(userId: string): Promise<UserQuestionProgress[]> {
