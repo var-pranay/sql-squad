@@ -65,7 +65,7 @@ export class DataService {
 
       const { data, error } = await query.order('created_at', { ascending: false });
       if (error) throw error;
-      questions = data || [];
+      questions = (data || []).map(q => this.normalizeQuestion(q));
     } else {
       questions = this.getLocal<Question[]>(this.STORAGE_QUESTIONS_KEY, []);
     }
@@ -106,11 +106,20 @@ export class DataService {
         .eq('slug', slug)
         .single();
       if (error) return null;
-      return data;
+      return this.normalizeQuestion(data);
     }
 
     const all = this.getLocal<Question[]>(this.STORAGE_QUESTIONS_KEY, []);
     return all.find(q => q.slug === slug) || null;
+  }
+
+  private normalizeQuestion(q: any): Question {
+    if (!q) return q;
+    return {
+      ...q,
+      dataset: Array.isArray(q.dataset) ? q.dataset[0] : q.dataset,
+      test_cases: q.test_cases || []
+    };
   }
 
   async getQuestionById(id: string): Promise<Question | null> {

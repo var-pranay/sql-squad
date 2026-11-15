@@ -7,7 +7,7 @@ import { environment } from '../../../environments/environment';
 })
 export class SupabaseService {
   private client: SupabaseClient | null = null;
-  public readonly isDemoMode: boolean;
+  public isDemoMode: boolean = false;
 
   constructor() {
     this.isDemoMode =
