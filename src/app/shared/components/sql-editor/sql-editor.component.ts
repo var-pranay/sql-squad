@@ -72,6 +72,27 @@ import { ThemeService } from '../../../core/services/theme.service';
             <span>Reset</span>
           </button>
 
+          <!-- Maximize / Restore Toggle Button (Desktop) -->
+          <button
+            type="button"
+            class="btn btn-outline btn-sm maximize-btn desktop-only"
+            (click)="toggleMaximizeRequested.emit()"
+            [title]="isMaximized ? 'Restore split layout' : 'Maximize editor (hide output)'">
+            @if (isMaximized) {
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="4 14 10 14 10 20"/>
+                <polyline points="20 10 14 10 14 4"/>
+              </svg>
+              <span>Restore</span>
+            } @else {
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="15 3 21 3 21 9"/>
+                <polyline points="9 21 3 21 3 15"/>
+              </svg>
+              <span>Expand</span>
+            }
+          </button>
+
           <!-- Run Query Button -->
           <button
             type="button"
@@ -208,7 +229,37 @@ import { ThemeService } from '../../../core/services/theme.service';
       flex: 1;
       height: 100%;
       min-height: 0;
-      overflow: auto;
+      width: 100%;
+      max-width: 100%;
+      overflow: hidden;
+    }
+
+    .desktop-only {
+      @media (max-width: 768px) {
+        display: none !important;
+      }
+    }
+
+    :host ::ng-deep {
+      .cm-editor {
+        height: 100%;
+        width: 100%;
+        max-width: 100%;
+        overflow: hidden;
+      }
+      .cm-scroller {
+        max-width: 100%;
+        overflow-x: hidden !important;
+      }
+      .cm-content {
+        white-space: pre-wrap !important;
+        word-break: break-word !important;
+      }
+      @media (max-width: 768px) {
+        .cm-content, .cm-line, .cm-editor {
+          font-size: 16px !important;
+        }
+      }
     }
   `]
 })
@@ -218,10 +269,12 @@ export class SqlEditorComponent implements AfterViewInit, OnDestroy, OnChanges {
   @Input() initialCode: string = '-- Write your PostgreSQL query here\n';
   @Input() starterCode: string = '';
   @Input() isRunning: boolean = false;
+  @Input() isMaximized: boolean = false;
 
   @Output() codeChange = new EventEmitter<string>();
   @Output() runRequested = new EventEmitter<string>();
   @Output() resetRequested = new EventEmitter<void>();
+  @Output() toggleMaximizeRequested = new EventEmitter<void>();
 
   isCopied = signal<boolean>(false);
 
@@ -272,6 +325,7 @@ export class SqlEditorComponent implements AfterViewInit, OnDestroy, OnChanges {
         basicSetup,
         sql({ dialect: PostgreSQL }),
         runKeymap,
+        EditorView.lineWrapping,
         this.themeCompartment.of(isDark ? oneDark : []),
         EditorView.updateListener.of(update => {
           if (update.docChanged) {
@@ -279,7 +333,7 @@ export class SqlEditorComponent implements AfterViewInit, OnDestroy, OnChanges {
           }
         }),
         EditorView.theme({
-          '&': { height: '100%', fontSize: '13.5px' },
+          '&': { height: '100%', fontSize: '14px' },
           '.cm-scroller': { overflow: 'auto', fontFamily: 'var(--font-mono)' },
           '.cm-content': { padding: '12px 0' },
           '.cm-line': { padding: '0 16px' }

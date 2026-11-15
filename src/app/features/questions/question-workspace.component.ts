@@ -17,6 +17,7 @@ import { DifficultyBadgeComponent } from '../../shared/components/badges/difficu
 type LeftTab = 'description' | 'schema' | 'hints' | 'submissions';
 type RightTab = 'results' | 'testcases';
 type MobileTab = 'description' | 'editor' | 'results';
+type RightPaneViewMode = 'split' | 'editor' | 'output';
 
 @Component({
   selector: 'app-question-workspace',
@@ -304,34 +305,98 @@ type MobileTab = 'description' | 'editor' | 'results';
           </div>
 
           <!-- RIGHT PANE: Code Editor (Top) & Output / Test Cases (Bottom) -->
-          <div class="pane right-pane">
+          <div class="pane right-pane" [class]="'pane-mode-' + rightPaneMode()">
+            <!-- DESKTOP WORKSPACE VIEW TOGGLE TOOLBAR -->
+            <div class="workspace-layout-bar">
+              <span class="layout-hint">View Mode:</span>
+              <div class="layout-btn-group">
+                <button
+                  type="button"
+                  class="layout-switch-btn"
+                  [class.active]="rightPaneMode() === 'split'"
+                  (click)="setRightPaneMode('split')"
+                  title="Split View (Editor + Output stacked)">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="18" height="18" rx="2"/>
+                    <line x1="3" y1="12" x2="21" y2="12"/>
+                  </svg>
+                  <span>Split View</span>
+                </button>
+                <button
+                  type="button"
+                  class="layout-switch-btn"
+                  [class.active]="rightPaneMode() === 'editor'"
+                  (click)="setRightPaneMode('editor')"
+                  title="Maximize Editor (Hide Output Window)">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="18" height="18" rx="2"/>
+                    <polyline points="15 3 21 3 21 9"/>
+                    <polyline points="9 21 3 21 3 15"/>
+                  </svg>
+                  <span>Editor Max</span>
+                </button>
+                <button
+                  type="button"
+                  class="layout-switch-btn"
+                  [class.active]="rightPaneMode() === 'output'"
+                  (click)="setRightPaneMode('output')"
+                  title="Maximize Output Window">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="18" height="18" rx="2"/>
+                    <line x1="3" y1="9" x2="21" y2="9"/>
+                    <line x1="9" y1="21" x2="9" y2="9"/>
+                  </svg>
+                  <span>Output Max</span>
+                </button>
+              </div>
+            </div>
+
             <div class="editor-section">
               <app-sql-editor
                 [initialCode]="userCode"
                 [starterCode]="starterTemplateCode()"
                 [isRunning]="isRunningQuery()"
+                [isMaximized]="rightPaneMode() === 'editor'"
                 (codeChange)="onCodeChange($event)"
                 (runRequested)="runQuery($event)"
-                (resetRequested)="onResetEditor()">
+                (resetRequested)="onResetEditor()"
+                (toggleMaximizeRequested)="toggleEditorMaximize()">
               </app-sql-editor>
             </div>
 
             <div class="console-section card">
               <div class="pane-tabs console-tabs">
-                <button
-                  type="button"
-                  class="pane-tab"
-                  [class.active]="activeRightTab() === 'results'"
-                  (click)="activeRightTab.set('results')">
-                  Execution Output
-                </button>
-                <button
-                  type="button"
-                  class="pane-tab"
-                  [class.active]="activeRightTab() === 'testcases'"
-                  (click)="activeRightTab.set('testcases')">
-                  Test Cases ({{ question()!.test_cases?.length || 0 }})
-                </button>
+                <div class="console-tabs-left">
+                  <button
+                    type="button"
+                    class="pane-tab"
+                    [class.active]="activeRightTab() === 'results'"
+                    (click)="activeRightTab.set('results')">
+                    Execution Output
+                  </button>
+                  <button
+                    type="button"
+                    class="pane-tab"
+                    [class.active]="activeRightTab() === 'testcases'"
+                    (click)="activeRightTab.set('testcases')">
+                    Test Cases ({{ question()!.test_cases?.length || 0 }})
+                  </button>
+                </div>
+                <div class="console-tabs-right">
+                  <button
+                    type="button"
+                    class="btn btn-outline btn-xs console-toggle-btn"
+                    (click)="toggleOutputMaximize()"
+                    [title]="rightPaneMode() === 'output' ? 'Restore Split View' : 'Maximize Output Window'">
+                    @if (rightPaneMode() === 'output') {
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/></svg>
+                      <span>Restore Split</span>
+                    } @else {
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/></svg>
+                      <span>Maximize</span>
+                    }
+                  </button>
+                </div>
               </div>
 
               <div class="console-body">
@@ -720,35 +785,153 @@ type MobileTab = 'description' | 'editor' | 'results';
     .right-pane {
       display: flex;
       flex-direction: column;
-      gap: 0.65rem;
+      gap: 0.5rem;
       flex: 1;
       min-height: 0;
       overflow: hidden;
+
+      &.pane-mode-split {
+        .editor-section {
+          flex: 66;
+          min-height: 180px;
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+        }
+        .console-section {
+          flex: 34;
+          min-height: 140px;
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+          background-color: var(--bg-primary);
+          border: 1px solid var(--border-subtle);
+          border-radius: var(--radius-md);
+        }
+      }
+
+      &.pane-mode-editor {
+        .editor-section {
+          flex: 1;
+          height: 100%;
+          min-height: 0;
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+        }
+        .console-section {
+          display: none !important;
+        }
+      }
+
+      &.pane-mode-output {
+        .editor-section {
+          display: none !important;
+        }
+        .console-section {
+          flex: 1;
+          height: 100%;
+          min-height: 0;
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+          background-color: var(--bg-primary);
+          border: 1px solid var(--border-subtle);
+          border-radius: var(--radius-md);
+        }
+      }
     }
 
-    .editor-section {
-      flex: 55;
-      min-height: 140px;
+    .workspace-layout-bar {
       display: flex;
-      flex-direction: column;
-      overflow: hidden;
-    }
-
-    .console-section {
-      flex: 45;
-      display: flex;
-      flex-direction: column;
-      min-height: 140px;
-      overflow: hidden;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 0.5rem;
+      padding: 0.25rem 0.6rem;
       background-color: var(--bg-primary);
       border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-md);
+      border-radius: var(--radius-sm);
+      flex-shrink: 0;
+
+      @media (max-width: 1024px) {
+        display: none;
+      }
+
+      .layout-hint {
+        font-size: 0.725rem;
+        font-weight: 600;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+
+      .layout-btn-group {
+        display: inline-flex;
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--radius-xs);
+        padding: 2px;
+        gap: 2px;
+      }
+
+      .layout-switch-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        background: transparent;
+        border: none;
+        color: var(--text-secondary);
+        font-size: 0.75rem;
+        font-weight: 600;
+        padding: 0.2rem 0.55rem;
+        border-radius: 3px;
+        cursor: pointer;
+        transition: all 120ms ease;
+
+        &:hover {
+          color: var(--text-primary);
+          background-color: var(--bg-hover);
+        }
+
+        &.active {
+          color: var(--accent-sky);
+          background-color: var(--bg-primary);
+          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+        }
+      }
     }
 
     .console-tabs {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
       flex-shrink: 0;
       background-color: var(--bg-secondary);
       border-bottom: 1px solid var(--border-subtle);
+      padding-right: 0.5rem;
+
+      .console-tabs-left {
+        display: flex;
+        overflow-x: auto;
+      }
+
+      .console-tabs-right {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+
+        @media (max-width: 1024px) {
+          display: none;
+        }
+      }
+    }
+
+    .console-toggle-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.2rem 0.45rem;
+      font-size: 0.725rem;
     }
 
     .console-body {
@@ -1059,6 +1242,7 @@ export class QuestionWorkspaceComponent implements OnInit {
   activeLeftTab = signal<LeftTab>('description');
   activeRightTab = signal<RightTab>('results');
   mobileView = signal<MobileTab>('description');
+  rightPaneMode = signal<RightPaneViewMode>('split');
 
   isRunningQuery = signal<boolean>(false);
   isEvaluating = signal<boolean>(false);
@@ -1110,11 +1294,28 @@ export class QuestionWorkspaceComponent implements OnInit {
     this.userCode = newCode;
   }
 
+  setRightPaneMode(mode: RightPaneViewMode): void {
+    this.rightPaneMode.set(mode);
+  }
+
+  toggleEditorMaximize(): void {
+    this.rightPaneMode.update(m => m === 'editor' ? 'split' : 'editor');
+  }
+
+  toggleOutputMaximize(): void {
+    this.rightPaneMode.update(m => m === 'output' ? 'split' : 'output');
+  }
+
   async runQuery(sqlQuery: string): Promise<void> {
     if (!this.question()?.dataset) return;
 
     this.isRunningQuery.set(true);
     this.activeRightTab.set('results');
+
+    // If editor was maximized, restore split so output is visible
+    if (this.rightPaneMode() === 'editor') {
+      this.rightPaneMode.set('split');
+    }
 
     // On mobile devices, automatically switch to results tab so output is instantly visible
     if (typeof window !== 'undefined' && window.innerWidth <= 1024) {
@@ -1147,6 +1348,10 @@ export class QuestionWorkspaceComponent implements OnInit {
     if (!q || !q.dataset) return;
 
     this.isEvaluating.set(true);
+
+    if (this.rightPaneMode() === 'editor') {
+      this.rightPaneMode.set('split');
+    }
 
     // On mobile devices, switch to results/tests tab
     if (typeof window !== 'undefined' && window.innerWidth <= 1024) {
