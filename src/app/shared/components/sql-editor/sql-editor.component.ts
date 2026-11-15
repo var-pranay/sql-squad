@@ -85,37 +85,28 @@ import { ThemeService } from '../../../core/services/theme.service';
             </svg>
             <span class="btn-label-text">Reset</span>
           </button>
-
-          <!-- Maximize / Restore Toggle Button (Desktop) -->
-          <button
-            type="button"
-            class="btn btn-outline btn-sm maximize-btn desktop-only"
-            (click)="toggleMaximizeRequested.emit()"
-            [title]="isMaximized ? 'Restore split layout' : 'Maximize editor (hide output)'">
-            @if (isMaximized) {
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="4 14 10 14 10 20"/>
-                <polyline points="20 10 14 10 14 4"/>
-              </svg>
-              <span class="btn-label-text">Restore</span>
-            } @else {
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="15 3 21 3 21 9"/>
-                <polyline points="9 21 3 21 3 15"/>
-              </svg>
-              <span class="btn-label-text">Expand</span>
-            }
-          </button>
         </div>
       </div>
       <div #editorHost class="editor-container"></div>
     </div>
   `,
   styles: [`
+    :host {
+      display: flex;
+      flex-direction: column;
+      flex: 1 1 0%;
+      height: 100%;
+      min-height: 0;
+      width: 100%;
+      overflow: hidden;
+    }
+
     .sql-editor-wrapper {
       display: flex;
       flex-direction: column;
       height: 100%;
+      flex: 1 1 0%;
+      min-height: 0;
       background-color: var(--bg-code);
       border: 1px solid var(--border-subtle);
       border-radius: var(--radius-md);

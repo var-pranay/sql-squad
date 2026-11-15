@@ -106,10 +106,22 @@ import { SqlQueryResult } from '../../../core/models/database.types';
     </div>
   `,
   styles: [`
+    :host {
+      display: flex;
+      flex-direction: column;
+      flex: 1 1 0%;
+      height: 100%;
+      min-height: 0;
+      width: 100%;
+      overflow: hidden;
+    }
+
     .results-wrapper {
       display: flex;
       flex-direction: column;
       height: 100%;
+      flex: 1 1 0%;
+      min-height: 0;
       background-color: var(--bg-primary);
       border: 1px solid var(--border-subtle);
       border-radius: var(--radius-md);

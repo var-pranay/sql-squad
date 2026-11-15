@@ -447,14 +447,25 @@ type RightPaneViewMode = 'editor' | 'output';
     </div>
   `,
   styles: [`
+    :host {
+      display: flex;
+      flex-direction: column;
+      flex: 1 1 0%;
+      height: 100%;
+      min-height: 0;
+      width: 100%;
+      overflow: hidden;
+    }
+
     .workspace-page {
       display: flex;
       flex-direction: column;
       gap: 0.65rem;
       height: 100%;
       max-height: 100%;
-      flex: 1;
+      flex: 1 1 0%;
       min-height: 0;
+      width: 100%;
       overflow: hidden;
 
       @media (max-width: 900px) {
@@ -701,22 +712,32 @@ type RightPaneViewMode = 'editor' | 'output';
 
     /* WORKSPACE SPLIT (Desktop: 2 columns, Mobile: Tab views) */
     .workspace-split {
-      display: grid;
-      grid-template-columns: 46% 54%;
+      display: flex;
+      flex-direction: row;
       gap: 0.75rem;
-      flex: 1;
+      flex: 1 1 0%;
+      height: 100%;
       min-height: 0;
+      width: 100%;
       overflow: hidden;
 
+      .left-pane {
+        flex: 0 0 46%;
+        width: 46%;
+        max-width: 46%;
+      }
+
+      .right-pane {
+        flex: 1 1 0%;
+        width: 54%;
+        min-width: 0;
+      }
+
       @media (max-width: 1024px) {
-        display: flex;
         flex-direction: column;
-        flex: 1;
-        min-height: 0;
-        height: 100%;
 
         &.mobile-active-description {
-          .left-pane { display: flex; flex: 1; height: 100%; min-height: 0; }
+          .left-pane { display: flex; flex: 1 1 0%; height: 100%; min-height: 0; width: 100%; max-width: 100%; }
           .right-pane { display: none; }
         }
 
@@ -724,10 +745,12 @@ type RightPaneViewMode = 'editor' | 'output';
           .left-pane { display: none; }
           .right-pane {
             display: flex;
-            flex: 1;
+            flex: 1 1 0%;
             height: 100%;
             min-height: 0;
-            .editor-section { display: flex; flex: 1; height: 100%; min-height: 0; }
+            width: 100%;
+            max-width: 100%;
+            .editor-section { display: flex; flex: 1 1 0%; height: 100%; min-height: 0; }
             .console-section { display: none; }
           }
         }
@@ -736,11 +759,13 @@ type RightPaneViewMode = 'editor' | 'output';
           .left-pane { display: none; }
           .right-pane {
             display: flex;
-            flex: 1;
+            flex: 1 1 0%;
             height: 100%;
             min-height: 0;
+            width: 100%;
+            max-width: 100%;
             .editor-section { display: none; }
-            .console-section { display: flex; flex: 1; height: 100%; min-height: 0; }
+            .console-section { display: flex; flex: 1 1 0%; height: 100%; min-height: 0; }
           }
         }
       }
@@ -828,6 +853,15 @@ type RightPaneViewMode = 'editor' | 'output';
         display: flex;
         flex-direction: column;
         overflow: hidden;
+
+        > app-sql-editor {
+          flex: 1 1 0;
+          height: 100%;
+          min-height: 0;
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+        }
       }
 
       .console-section {
@@ -889,11 +923,29 @@ type RightPaneViewMode = 'editor' | 'output';
     }
 
     .console-body {
-      flex: 1;
+      flex: 1 1 0%;
+      height: 100%;
       min-height: 0;
       overflow: hidden;
       display: flex;
       flex-direction: column;
+
+      > app-sql-results-table {
+        flex: 1 1 0%;
+        height: 100%;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      .testcases-view {
+        flex: 1 1 0%;
+        height: 100%;
+        min-height: 0;
+        overflow-y: auto;
+        padding: 0.85rem;
+      }
     }
 
     .rendered-markdown {

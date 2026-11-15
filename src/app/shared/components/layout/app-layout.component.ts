@@ -554,7 +554,7 @@ import { StreakBadgeComponent } from '../badges/streak-badge.component';
     }
 
     .app-content {
-      flex: 1;
+      flex: 1 1 0%;
       padding: 0.75rem 1rem;
       max-width: 1600px;
       width: 100%;
@@ -564,6 +564,15 @@ import { StreakBadgeComponent } from '../badges/streak-badge.component';
       flex-direction: column;
       height: 100%;
       min-height: 0;
+
+      > * {
+        flex: 1 1 0%;
+        height: 100%;
+        min-height: 0;
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+      }
 
       @media (max-width: 900px) {
         padding: 0.35rem 0.5rem;
