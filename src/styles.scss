@@ -110,6 +110,10 @@
   padding: 0;
 }
 
+router-outlet {
+  display: none !important;
+}
+
 html, body {
   height: 100%;
   width: 100%;

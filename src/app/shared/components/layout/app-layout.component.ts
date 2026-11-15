@@ -565,7 +565,14 @@ import { StreakBadgeComponent } from '../badges/streak-badge.component';
       height: 100%;
       min-height: 0;
 
-      > * {
+      > router-outlet {
+        display: none !important;
+        height: 0 !important;
+        width: 0 !important;
+        flex: 0 0 0 !important;
+      }
+
+      > *:not(router-outlet) {
         flex: 1 1 0%;
         height: 100%;
         min-height: 0;
