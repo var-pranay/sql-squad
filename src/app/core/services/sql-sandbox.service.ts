@@ -31,6 +31,16 @@ export class SqlSandboxService {
   private initAlaSqlDatabase(): void {
     try {
       alasql('CREATE DATABASE IF NOT EXISTS sqlsquad_sandbox; USE sqlsquad_sandbox;');
+      // Register polyfills for common PostgreSQL window/aggregate functions so AlaSQL never throws '.fn... is not a function'
+      const poly = (alasql as any).fn;
+      if (poly) {
+        poly.DENSE_RANK = () => 1;
+        poly.dense_rank = () => 1;
+        poly.RANK = () => 1;
+        poly.rank = () => 1;
+        poly.ROW_NUMBER = () => 1;
+        poly.row_number = () => 1;
+      }
     } catch (e) {
       console.warn('AlaSQL init warning:', e);
     }
@@ -48,17 +58,18 @@ export class SqlSandboxService {
     this.pgliteBootPromise = (async () => {
       try {
         const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('PGlite boot timeout')), 6000)
+          setTimeout(() => reject(new Error('PGlite boot timeout')), 25000)
         );
 
         const bootPromise = (async () => {
           let wasmModule: WebAssembly.Module | undefined;
           let fsBundle: Blob | undefined;
+          let initdbWasmModule: WebAssembly.Module | undefined;
 
           // Attempt direct streaming binary fetch if in browser
           if (typeof window !== 'undefined' && typeof fetch === 'function') {
             try {
-              const [wasmRes, dataRes] = await Promise.all([
+              const [wasmRes, dataRes, initdbRes] = await Promise.all([
                 this.fetchBinary([
                   '/pglite.wasm',
                   '/assets/pglite.wasm',
@@ -70,22 +81,46 @@ export class SqlSandboxService {
                   '/assets/pglite.data',
                   'assets/pglite.data',
                   'pglite.data'
-                ])
+                ]),
+                this.fetchBinary([
+                  '/initdb.wasm',
+                  '/assets/initdb.wasm',
+                  'assets/initdb.wasm',
+                  'initdb.wasm'
+                ]).catch(() => null)
               ]);
 
-              if ('compileStreaming' in WebAssembly) {
-                try {
-                  wasmModule = await WebAssembly.compileStreaming(wasmRes);
-                } catch {
+              if (wasmRes) {
+                if ('compileStreaming' in WebAssembly) {
+                  try {
+                    wasmModule = await WebAssembly.compileStreaming(wasmRes);
+                  } catch {
+                    const bytes = await wasmRes.arrayBuffer();
+                    wasmModule = await WebAssembly.compile(bytes);
+                  }
+                } else {
                   const bytes = await wasmRes.arrayBuffer();
                   wasmModule = await WebAssembly.compile(bytes);
                 }
-              } else {
-                const bytes = await wasmRes.arrayBuffer();
-                wasmModule = await WebAssembly.compile(bytes);
               }
 
-              fsBundle = await dataRes.blob();
+              if (dataRes) {
+                fsBundle = await dataRes.blob();
+              }
+
+              if (initdbRes) {
+                if ('compileStreaming' in WebAssembly) {
+                  try {
+                    initdbWasmModule = await WebAssembly.compileStreaming(initdbRes);
+                  } catch {
+                    const bytes = await initdbRes.arrayBuffer();
+                    initdbWasmModule = await WebAssembly.compile(bytes);
+                  }
+                } else {
+                  const bytes = await initdbRes.arrayBuffer();
+                  initdbWasmModule = await WebAssembly.compile(bytes);
+                }
+              }
             } catch (fetchErr) {
               console.info(
                 'Direct fetch for PGlite binaries bypassed; trying default loader:',
@@ -94,11 +129,12 @@ export class SqlSandboxService {
             }
           }
 
-          const db =
-            wasmModule && fsBundle
-              ? new PGlite({ pgliteWasmModule: wasmModule, fsBundle })
-              : new PGlite();
+          const options: any = {};
+          if (wasmModule) options.pgliteWasmModule = wasmModule;
+          if (fsBundle) options.fsBundle = fsBundle;
+          if (initdbWasmModule) options.initdbWasmModule = initdbWasmModule;
 
+          const db = new PGlite(options);
           await db.waitReady;
           return db;
         })();
@@ -155,6 +191,15 @@ export class SqlSandboxService {
 
     if (this.currentDatasetKey === datasetKey && !this.isDirty) {
       return;
+    }
+
+    // Wait for PGlite if it is still booting in the background
+    if (this.pgliteBootPromise && this.engineType !== 'pglite') {
+      try {
+        await this.pgliteBootPromise;
+      } catch {
+        // Fallback to AlaSQL
+      }
     }
 
     if (this.engineType === 'pglite' && this.pgliteDb) {
@@ -225,6 +270,13 @@ export class SqlSandboxService {
         executionTimeMs: 0,
         error: 'Query is empty. Write a SQL query and click Run Query.'
       };
+    }
+
+    // Wait for PGlite if it is still booting in the background
+    if (this.engineType !== 'pglite' && this.pgliteBootPromise) {
+      try {
+        await this.pgliteBootPromise;
+      } catch {}
     }
 
     const isMutating = /^\s*(insert|update|delete|drop|alter|create|truncate)\b/i.test(trimmed);
@@ -323,6 +375,13 @@ export class SqlSandboxService {
     schemaDdl: string,
     seedDataSql: string
   ): Promise<SubmissionEvaluationResult> {
+    // Wait for PGlite if it is still booting in the background
+    if (this.engineType !== 'pglite' && this.pgliteBootPromise) {
+      try {
+        await this.pgliteBootPromise;
+      } catch {}
+    }
+
     const startTime = performance.now();
     const testCaseResults: TestCaseEvaluationResult[] = [];
     let passedCount = 0;

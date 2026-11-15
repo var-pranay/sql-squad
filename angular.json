@@ -32,6 +32,11 @@
                 "glob": "pglite.*",
                 "input": "node_modules/@electric-sql/pglite/dist",
                 "output": "./"
+              },
+              {
+                "glob": "initdb.*",
+                "input": "node_modules/@electric-sql/pglite/dist",
+                "output": "./"
               }
             ],
             "styles": [
@@ -114,6 +119,11 @@
               "src/assets",
               {
                 "glob": "pglite.*",
+                "input": "node_modules/@electric-sql/pglite/dist",
+                "output": "./"
+              },
+              {
+                "glob": "initdb.*",
                 "input": "node_modules/@electric-sql/pglite/dist",
                 "output": "./"
               }
