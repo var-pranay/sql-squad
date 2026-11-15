@@ -7,7 +7,8 @@ import {
   UserQuestionProgress,
   LeaderboardScore,
   UserProfile,
-  SubmissionStatus
+  SubmissionStatus,
+  AppRole
 } from '../models/database.types';
 
 @Injectable({
@@ -331,33 +332,60 @@ export class DataService {
   async getAdminUsers(): Promise<any[]> {
     if (!this.supabase.isDemoMode && this.supabase.clientInstance) {
       try {
-        const { data, error } = await this.supabase.clientInstance
-          .from('profiles')
-          .select(`
-            id,
-            username,
-            full_name,
-            current_streak,
-            created_at,
-            user_roles ( role )
-          `);
+        const [profilesRes, rolesRes] = await Promise.all([
+          this.supabase.clientInstance
+            .from('profiles')
+            .select('*')
+            .order('created_at', { ascending: false }),
+          this.supabase.clientInstance
+            .from('user_roles')
+            .select('*')
+        ]);
 
-        if (!error && data && data.length > 0) {
-          return data.map((u: any) => ({
+        const roleMap = new Map<string, string>();
+        if (rolesRes.data) {
+          for (const r of rolesRes.data) {
+            roleMap.set(r.user_id, r.role);
+          }
+        }
+
+        const profiles = profilesRes.data || [];
+        if (profiles.length > 0) {
+          return profiles.map((u: any) => ({
             id: u.id,
             username: u.username || 'user',
-            email: u.username ? `${u.username}@sqlsquad.dev` : 'user@sqlsquad.dev',
-            role: u.user_roles && u.user_roles.length > 0 ? u.user_roles[0].role : 'user',
+            email: u.username?.includes('@') ? u.username : `${u.username}@sqlsquad.dev`,
+            role: (roleMap.get(u.id) || 'user') as AppRole,
             current_streak: u.current_streak || 0,
             total_solved: 0,
-            created_at: u.created_at ? new Date(u.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recently'
+            created_at: u.created_at
+              ? new Date(u.created_at).toLocaleDateString(undefined, {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric'
+                })
+              : 'Recently'
           }));
         }
       } catch (err) {
-        console.warn('Error fetching admin users:', err);
+        console.warn('Error fetching admin users from Supabase:', err);
       }
     }
     return [];
+  }
+
+  async updateUserRole(userId: string, role: AppRole): Promise<boolean> {
+    if (!this.supabase.isDemoMode && this.supabase.clientInstance) {
+      try {
+        const { error } = await this.supabase.clientInstance
+          .from('user_roles')
+          .upsert({ user_id: userId, role }, { onConflict: 'user_id' });
+        return !error;
+      } catch (err) {
+        console.warn('Update user role error:', err);
+      }
+    }
+    return false;
   }
 
   async getUserProgress(userId: string): Promise<UserQuestionProgress[]> {
@@ -404,8 +432,76 @@ export class DataService {
   }
 
   async getLeaderboard(): Promise<LeaderboardScore[]> {
-    const leaderboard = this.getLocal<LeaderboardScore[]>(this.STORAGE_LEADERBOARD_KEY, []);
-    return leaderboard.sort((a, b) => b.total_points - a.total_points);
+    if (!this.supabase.isDemoMode && this.supabase.clientInstance) {
+      try {
+        const [scoresRes, profilesRes] = await Promise.all([
+          this.supabase.clientInstance
+            .from('leaderboard_scores')
+            .select('*')
+            .order('total_points', { ascending: false }),
+          this.supabase.clientInstance
+            .from('profiles')
+            .select('*')
+        ]);
+
+        const profileMap = new Map((profilesRes.data || []).map((p: any) => [p.id, p]));
+        const scores = scoresRes.data || [];
+
+        if (scores.length > 0) {
+          return scores.map((s: any, idx: number) => {
+            const prof = profileMap.get(s.user_id);
+            return {
+              id: s.id,
+              user_id: s.user_id,
+              total_solved: s.total_solved || 0,
+              easy_solved: s.easy_solved || 0,
+              medium_solved: s.medium_solved || 0,
+              hard_solved: s.hard_solved || 0,
+              total_points: s.total_points || 0,
+              current_streak: s.current_streak || 0,
+              rank_position: idx + 1,
+              updated_at: s.updated_at,
+              profile: prof || {
+                id: s.user_id,
+                username: `user_${s.user_id.substring(0, 6)}`,
+                full_name: 'SQL Solver',
+                avatar_url: null,
+                bio: null,
+                current_streak: s.current_streak || 0,
+                max_streak: s.current_streak || 0,
+                last_active_date: null,
+                created_at: s.updated_at,
+                updated_at: s.updated_at
+              }
+            };
+          });
+        }
+
+        // If leaderboard_scores is empty or not yet rolled up, show real registered practitioners from profiles
+        const profiles = profilesRes.data || [];
+        if (profiles.length > 0) {
+          return profiles.map((p: any, idx: number) => ({
+            id: `lb_${p.id}`,
+            user_id: p.id,
+            total_solved: 0,
+            easy_solved: 0,
+            medium_solved: 0,
+            hard_solved: 0,
+            total_points: 0,
+            current_streak: p.current_streak || 0,
+            rank_position: idx + 1,
+            updated_at: p.updated_at || new Date().toISOString(),
+            profile: p
+          }));
+        }
+
+        return [];
+      } catch (err) {
+        console.warn('Error fetching leaderboard from Supabase:', err);
+      }
+    }
+
+    return [];
   }
 
   private getLocal<T>(key: string, defaultValue: T): T {

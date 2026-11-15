@@ -101,6 +101,12 @@ import { StreakBadgeComponent } from '../../shared/components/badges/streak-badg
                     {{ entry.total_points }} XP
                   </td>
                 </tr>
+              } @empty {
+                <tr>
+                  <td colspan="5" style="text-align: center; padding: 2.5rem; color: var(--text-muted);">
+                    No practitioners on the leaderboard yet. Solve a SQL challenge to rank #1!
+                  </td>
+                </tr>
               }
             </tbody>
           </table>

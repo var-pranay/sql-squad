@@ -91,6 +91,28 @@ export class AuthService {
         .eq('user_id', data.user.id)
         .single();
 
+      // Ensure profile exists in public.profiles table
+      try {
+        const { data: prof } = await this.supabase.clientInstance
+          .from('profiles')
+          .select('id')
+          .eq('id', data.user.id)
+          .single();
+
+        if (!prof) {
+          const uname = data.user.user_metadata?.['username'] || email.split('@')[0];
+          await this.supabase.clientInstance.from('profiles').upsert({
+            id: data.user.id,
+            username: uname,
+            full_name: data.user.user_metadata?.['full_name'] || uname,
+            current_streak: 0,
+            max_streak: 0
+          });
+        }
+      } catch (e) {
+        console.info('Profile ensure check:', e);
+      }
+
       const authUser: AuthUser = {
         id: data.user.id,
         email: data.user.email || email,
@@ -144,6 +166,24 @@ export class AuthService {
         }
       });
       if (error) return { success: false, error: error.message };
+
+      if (data.user) {
+        try {
+          await this.supabase.clientInstance.from('profiles').upsert({
+            id: data.user.id,
+            username: username || email.split('@')[0],
+            full_name: fullName || username,
+            current_streak: 0,
+            max_streak: 0
+          });
+          await this.supabase.clientInstance.from('user_roles').upsert({
+            user_id: data.user.id,
+            role: 'user'
+          }, { onConflict: 'user_id,role' });
+        } catch (pErr) {
+          console.info('Client-side profile sync info:', pErr);
+        }
+      }
 
       const user: AuthUser = {
         id: data.user?.id || `user_${Date.now()}`,

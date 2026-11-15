@@ -69,6 +69,12 @@ interface ManagedUser {
                     </button>
                   </td>
                 </tr>
+              } @empty {
+                <tr>
+                  <td colspan="7" style="text-align: center; padding: 2.5rem; color: var(--text-muted);">
+                    No registered practitioners found yet.
+                  </td>
+                </tr>
               }
             </tbody>
           </table>
@@ -169,8 +175,9 @@ export class AdminUsersComponent implements OnInit {
     }
   }
 
-  toggleRole(user: ManagedUser): void {
+  async toggleRole(user: ManagedUser): Promise<void> {
     const nextRole: AppRole = user.role === 'admin' ? 'user' : 'admin';
+    await this.dataService.updateUserRole(user.id, nextRole);
     user.role = nextRole;
   }
 
