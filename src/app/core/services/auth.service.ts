@@ -421,9 +421,10 @@ export class AuthService {
         } catch {}
       }
 
-      const redirectTo = typeof window !== 'undefined'
-        ? `${window.location.origin}/auth/login`
-        : 'https://sql-squad.vercel.app/auth/login';
+      const baseUrl = typeof window !== 'undefined' && window.location.origin.includes('localhost')
+        ? window.location.origin
+        : 'https://sql-squad.vercel.app';
+      const redirectTo = `${baseUrl}/auth/reset-password`;
 
       const { error } = await this.supabase.clientInstance.auth.resetPasswordForEmail(emailToUse, {
         redirectTo
@@ -437,6 +438,19 @@ export class AuthService {
     }
 
     // Demo Mode
+    return { success: true };
+  }
+
+  async updatePassword(newPassword: string): Promise<{ success: boolean; error?: string }> {
+    if (!this.supabase.isDemoMode && this.supabase.clientInstance) {
+      const { error } = await this.supabase.clientInstance.auth.updateUser({
+        password: newPassword
+      });
+      if (error) {
+        return { success: false, error: error.message };
+      }
+      return { success: true };
+    }
     return { success: true };
   }
 

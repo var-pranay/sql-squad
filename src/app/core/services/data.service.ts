@@ -534,6 +534,56 @@ export class DataService {
     return false;
   }
 
+  async deleteUser(userId: string): Promise<{ success: boolean; error?: string }> {
+    if (!this.supabase.isDemoMode && this.supabase.clientInstance) {
+      // 1. Attempt delete via Postgres RPC function
+      try {
+        const { data, error } = await this.supabase.clientInstance
+          .rpc('delete_user_by_admin', { p_user_id: userId });
+
+        if (!error && data?.success !== false) {
+          return { success: true };
+        }
+        if (data?.error) {
+          return { success: false, error: data.error };
+        }
+      } catch (e: any) {
+        console.warn('RPC delete_user_by_admin error, attempting direct delete:', e);
+      }
+
+      // 2. Direct fallback
+      try {
+        await this.supabase.clientInstance.from('user_question_progress').delete().eq('user_id', userId);
+        await this.supabase.clientInstance.from('submissions').delete().eq('user_id', userId);
+        await this.supabase.clientInstance.from('user_roles').delete().eq('user_id', userId);
+        const { error: profError } = await this.supabase.clientInstance
+          .from('profiles')
+          .delete()
+          .eq('id', userId);
+
+        if (profError) {
+          return { success: false, error: profError.message };
+        }
+        return { success: true };
+      } catch (err: any) {
+        return { success: false, error: err.message || 'Failed to delete user.' };
+      }
+    }
+
+    // Demo Mode
+    if (typeof localStorage !== 'undefined') {
+      const stored = localStorage.getItem('sql_squad_known_users_v1');
+      if (stored) {
+        try {
+          const map = JSON.parse(stored);
+          delete map[userId];
+          localStorage.setItem('sql_squad_known_users_v1', JSON.stringify(map));
+        } catch {}
+      }
+    }
+    return { success: true };
+  }
+
   async getUserProgress(userId: string): Promise<UserQuestionProgress[]> {
     const localProgress = this.getLocal<UserQuestionProgress[]>(this.STORAGE_PROGRESS_KEY, []).filter(
       p => p.user_id === userId

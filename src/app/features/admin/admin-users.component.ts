@@ -28,6 +28,12 @@ interface ManagedUser {
         </div>
       </div>
 
+      @if (actionMessage()) {
+        <div class="status-banner" [class.success]="actionMessage()!.type === 'success'" [class.error]="actionMessage()!.type === 'error'">
+          <span>{{ actionMessage()!.text }}</span>
+        </div>
+      }
+
       <div class="card table-card">
         <div class="table-responsive">
           <table class="data-table">
@@ -39,7 +45,7 @@ interface ManagedUser {
                 <th>Streak</th>
                 <th>Solved</th>
                 <th>Joined</th>
-                <th style="text-align: right;">Action</th>
+                <th style="text-align: right;">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -61,12 +67,27 @@ interface ManagedUser {
                   <td>{{ user.total_solved }}</td>
                   <td class="date-text">{{ user.created_at }}</td>
                   <td style="text-align: right;">
-                    <button
-                      type="button"
-                      class="btn btn-outline btn-sm"
-                      (click)="toggleRole(user)">
-                      {{ user.role === 'admin' ? 'Demote to User' : 'Promote to Admin' }}
-                    </button>
+                    <div class="actions-group">
+                      <button
+                        type="button"
+                        class="btn btn-outline btn-sm"
+                        (click)="toggleRole(user)"
+                        [title]="user.role === 'admin' ? 'Demote to regular user' : 'Promote to admin'">
+                        {{ user.role === 'admin' ? 'Demote' : 'Promote' }}
+                      </button>
+                      <button
+                        type="button"
+                        class="btn btn-outline btn-sm delete-btn"
+                        (click)="deleteUser(user)"
+                        [disabled]="isDeleting() === user.id"
+                        title="Delete user and all their records">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <polyline points="3 6 5 6 21 6"/>
+                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                        </svg>
+                        <span>{{ isDeleting() === user.id ? 'Deleting...' : 'Delete' }}</span>
+                      </button>
+                    </div>
                   </td>
                 </tr>
               } @empty {
@@ -144,6 +165,47 @@ interface ManagedUser {
         border: 1px solid rgba(139, 92, 246, 0.3);
       }
     }
+    .actions-group {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      justify-content: flex-end;
+    }
+
+    .delete-btn {
+      color: var(--accent-danger);
+      border-color: rgba(239, 68, 68, 0.3);
+
+      &:hover:not(:disabled) {
+        background-color: var(--accent-danger);
+        color: #ffffff;
+        border-color: var(--accent-danger);
+      }
+
+      &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+    }
+
+    .status-banner {
+      padding: 0.75rem 1rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.85rem;
+      font-weight: 500;
+
+      &.success {
+        background-color: var(--accent-success-subtle);
+        border: 1px solid rgba(16, 185, 129, 0.3);
+        color: var(--accent-success);
+      }
+
+      &.error {
+        background-color: var(--accent-danger-subtle);
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        color: #fca5a5;
+      }
+    }
   `]
 })
 export class AdminUsersComponent implements OnInit {
@@ -151,6 +213,8 @@ export class AdminUsersComponent implements OnInit {
   private dataService = inject(DataService);
 
   users = signal<ManagedUser[]>([]);
+  isDeleting = signal<string | null>(null);
+  actionMessage = signal<{ type: 'success' | 'error'; text: string } | null>(null);
 
   async ngOnInit(): Promise<void> {
     const list = await this.dataService.getAdminUsers();
@@ -179,6 +243,32 @@ export class AdminUsersComponent implements OnInit {
     const nextRole: AppRole = user.role === 'admin' ? 'user' : 'admin';
     await this.dataService.updateUserRole(user.id, nextRole);
     user.role = nextRole;
+  }
+
+  async deleteUser(user: ManagedUser): Promise<void> {
+    const current = this.auth.currentUser();
+    if (current && (current.id === user.id || current.username === user.username)) {
+      alert('You cannot delete your own active admin account.');
+      return;
+    }
+
+    const confirmed = confirm(
+      `Are you sure you want to permanently delete user "${user.username}" (${user.email})?\n\nThis will remove their profile, streak, progress, and all submissions.`
+    );
+    if (!confirmed) return;
+
+    this.isDeleting.set(user.id);
+    const res = await this.dataService.deleteUser(user.id);
+    this.isDeleting.set(null);
+
+    if (res.success) {
+      this.users.update(list => list.filter(u => u.id !== user.id));
+      this.actionMessage.set({ type: 'success', text: `User "${user.username}" was permanently deleted.` });
+      setTimeout(() => this.actionMessage.set(null), 4000);
+    } else {
+      this.actionMessage.set({ type: 'error', text: res.error || 'Failed to delete user.' });
+      setTimeout(() => this.actionMessage.set(null), 5000);
+    }
   }
 
   getInitials(name: string): string {
