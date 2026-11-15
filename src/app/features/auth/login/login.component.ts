@@ -66,25 +66,6 @@ import { AuthService } from '../../../core/services/auth.service';
             }
           </div>
 
-          <div class="quick-credentials">
-            <span class="quick-title">⚡ Instant Demo Access:</span>
-            <div class="quick-buttons">
-              <button type="button" class="btn btn-outline btn-sm demo-btn" (click)="demoLogin('user')" [disabled]="isLoading()">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                  <circle cx="12" cy="7" r="4"/>
-                </svg>
-                Sign in as Student / User
-              </button>
-              <button type="button" class="btn btn-outline btn-sm demo-btn admin-demo" (click)="demoLogin('admin')" [disabled]="isLoading()">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                </svg>
-                Sign in as Admin
-              </button>
-            </div>
-          </div>
-
           <button type="submit" class="btn btn-primary submit-btn" [disabled]="loginForm.invalid || isLoading()">
             {{ isLoading() ? 'Signing In...' : 'Sign In' }}
           </button>
@@ -167,33 +148,11 @@ import { AuthService } from '../../../core/services/auth.service';
       color: var(--accent-sky);
     }
 
-    .quick-credentials {
-      background-color: var(--bg-secondary);
-      border: 1px solid var(--border-subtle);
-      padding: 0.75rem;
-      border-radius: var(--radius-sm);
-      margin-bottom: 1.25rem;
-
-      .quick-title {
-        display: block;
-        font-size: 0.7rem;
-        font-weight: 700;
-        text-transform: uppercase;
-        color: var(--text-muted);
-        margin-bottom: 0.4rem;
-      }
-
-      .quick-buttons {
-        display: flex;
-        gap: 0.5rem;
-      }
-    }
-
     .submit-btn {
       width: 100%;
       padding: 0.75rem;
       font-size: 0.95rem;
-      margin-top: 0.25rem;
+      margin-top: 1rem;
     }
 
     .auth-footer {
@@ -223,16 +182,6 @@ export class LoginComponent {
     email: ['', [Validators.required, Validators.email]],
     password: ['', [Validators.required, Validators.minLength(6)]]
   });
-
-  async demoLogin(role: 'user' | 'admin'): Promise<void> {
-    this.isLoading.set(true);
-    await this.auth.loginAsDemo(role);
-    this.isLoading.set(false);
-  }
-
-  fillCredentials(email: string, pass: string): void {
-    this.loginForm.patchValue({ email, password: pass });
-  }
 
   async onSubmit(): Promise<void> {
     if (this.loginForm.invalid) return;
