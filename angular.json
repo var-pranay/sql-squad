@@ -37,6 +37,16 @@
                 "glob": "initdb.*",
                 "input": "node_modules/@electric-sql/pglite/dist",
                 "output": "./"
+              },
+              {
+                "glob": "pglite.*",
+                "input": "node_modules/@electric-sql/pglite/dist",
+                "output": "./assets"
+              },
+              {
+                "glob": "initdb.*",
+                "input": "node_modules/@electric-sql/pglite/dist",
+                "output": "./assets"
               }
             ],
             "styles": [
@@ -126,6 +136,16 @@
                 "glob": "initdb.*",
                 "input": "node_modules/@electric-sql/pglite/dist",
                 "output": "./"
+              },
+              {
+                "glob": "pglite.*",
+                "input": "node_modules/@electric-sql/pglite/dist",
+                "output": "./assets"
+              },
+              {
+                "glob": "initdb.*",
+                "input": "node_modules/@electric-sql/pglite/dist",
+                "output": "./assets"
               }
             ],
             "styles": [

@@ -66,42 +66,34 @@ export class SqlSandboxService {
           let fsBundle: Blob | undefined;
           let initdbWasmModule: WebAssembly.Module | undefined;
 
-          // Attempt direct streaming binary fetch if in browser
+          // Attempt direct binary fetch if in browser with cache-busting
           if (typeof window !== 'undefined' && typeof fetch === 'function') {
             try {
+              const version = 'v16.1.1';
               const [wasmRes, dataRes, initdbRes] = await Promise.all([
                 this.fetchBinary([
-                  '/pglite.wasm',
-                  '/assets/pglite.wasm',
-                  'assets/pglite.wasm',
-                  'pglite.wasm'
+                  `/assets/pglite.wasm?v=${version}`,
+                  `/pglite.wasm?v=${version}`,
+                  `assets/pglite.wasm?v=${version}`,
+                  `pglite.wasm?v=${version}`
                 ]),
                 this.fetchBinary([
-                  '/pglite.data',
-                  '/assets/pglite.data',
-                  'assets/pglite.data',
-                  'pglite.data'
+                  `/assets/pglite.data?v=${version}`,
+                  `/pglite.data?v=${version}`,
+                  `assets/pglite.data?v=${version}`,
+                  `pglite.data?v=${version}`
                 ]),
                 this.fetchBinary([
-                  '/initdb.wasm',
-                  '/assets/initdb.wasm',
-                  'assets/initdb.wasm',
-                  'initdb.wasm'
+                  `/assets/initdb.wasm?v=${version}`,
+                  `/initdb.wasm?v=${version}`,
+                  `assets/initdb.wasm?v=${version}`,
+                  `initdb.wasm?v=${version}`
                 ]).catch(() => null)
               ]);
 
               if (wasmRes) {
-                if ('compileStreaming' in WebAssembly) {
-                  try {
-                    wasmModule = await WebAssembly.compileStreaming(wasmRes);
-                  } catch {
-                    const bytes = await wasmRes.arrayBuffer();
-                    wasmModule = await WebAssembly.compile(bytes);
-                  }
-                } else {
-                  const bytes = await wasmRes.arrayBuffer();
-                  wasmModule = await WebAssembly.compile(bytes);
-                }
+                const bytes = await wasmRes.arrayBuffer();
+                wasmModule = await WebAssembly.compile(bytes);
               }
 
               if (dataRes) {
@@ -109,17 +101,8 @@ export class SqlSandboxService {
               }
 
               if (initdbRes) {
-                if ('compileStreaming' in WebAssembly) {
-                  try {
-                    initdbWasmModule = await WebAssembly.compileStreaming(initdbRes);
-                  } catch {
-                    const bytes = await initdbRes.arrayBuffer();
-                    initdbWasmModule = await WebAssembly.compile(bytes);
-                  }
-                } else {
-                  const bytes = await initdbRes.arrayBuffer();
-                  initdbWasmModule = await WebAssembly.compile(bytes);
-                }
+                const bytes = await initdbRes.arrayBuffer();
+                initdbWasmModule = await WebAssembly.compile(bytes);
               }
             } catch (fetchErr) {
               console.info(
