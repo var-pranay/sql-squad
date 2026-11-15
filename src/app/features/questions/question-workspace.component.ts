@@ -63,17 +63,31 @@ type RightPaneViewMode = 'split' | 'editor' | 'output';
               <span class="reward-pill">+{{ question()!.points }} XP</span>
             </div>
 
-            <button
-              type="button"
-              class="btn btn-success submit-btn"
-              (click)="submitSolution()"
-              [disabled]="isEvaluating() || isRunningQuery()">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-                <polyline points="22 4 12 14.01 9 11.01"/>
-              </svg>
-              <span>{{ isEvaluating() ? 'Evaluating...' : 'Submit Solution' }}</span>
-            </button>
+            <div class="topbar-actions-group">
+              <button
+                type="button"
+                class="btn btn-primary topbar-run-btn"
+                (click)="runQuery(userCode)"
+                [disabled]="isRunningQuery() || isEvaluating()"
+                title="Execute Query (Ctrl + Enter)">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+                  <polygon points="5 3 19 12 5 21 5 3"/>
+                </svg>
+                <span>{{ isRunningQuery() ? 'Running...' : 'Run Query' }}</span>
+              </button>
+
+              <button
+                type="button"
+                class="btn btn-success submit-btn"
+                (click)="submitSolution()"
+                [disabled]="isEvaluating() || isRunningQuery()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                  <polyline points="22 4 12 14.01 9 11.01"/>
+                </svg>
+                <span>{{ isEvaluating() ? 'Evaluating...' : 'Submit Solution' }}</span>
+              </button>
+            </div>
           </div>
 
           <div class="topbar-mobile-title">
@@ -548,6 +562,28 @@ type RightPaneViewMode = 'split' | 'editor' | 'output';
       padding: 0.25rem 0.6rem;
       font-size: 0.775rem;
       flex-shrink: 0;
+    }
+
+    .topbar-actions-group {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      flex-shrink: 0;
+    }
+
+    .topbar-run-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.35rem 0.75rem;
+      font-size: 0.8rem;
+      font-weight: 700;
+      flex-shrink: 0;
+
+      @media (max-width: 480px) {
+        padding: 0.3rem 0.5rem;
+        font-size: 0.75rem;
+      }
     }
 
     .submit-btn {

@@ -211,8 +211,11 @@ export class DataService {
     totalTestCases: number,
     errorMessage: string | null = null
   ): Promise<Submission> {
+    const submissionId = `sub_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const now = new Date().toISOString();
+
     const submission: Submission = {
-      id: `sub_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      id: submissionId,
       user_id: userId,
       question_id: questionId,
       query_sql: querySql,
@@ -221,9 +224,10 @@ export class DataService {
       error_message: errorMessage,
       passed_test_cases: passedTestCases,
       total_test_cases: totalTestCases,
-      submitted_at: new Date().toISOString()
+      submitted_at: now
     };
 
+    // 1. Always update local storage
     const submissions = this.getLocal<Submission[]>(this.STORAGE_SUBMISSIONS_KEY, []);
     submissions.unshift(submission);
     this.setLocal(this.STORAGE_SUBMISSIONS_KEY, submissions);
@@ -232,11 +236,118 @@ export class DataService {
       this.updateProgressAndStreak(userId, questionId, executionTimeMs);
     }
 
+    // 2. Persist to Supabase if connected
+    if (!this.supabase.isDemoMode && this.supabase.clientInstance && userId) {
+      try {
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(questionId);
+
+        if (isUuid) {
+          // Insert submission record into Supabase
+          const { data: inserted, error: subError } = await this.supabase.clientInstance
+            .from('submissions')
+            .insert({
+              user_id: userId,
+              question_id: questionId,
+              query_sql: querySql,
+              status,
+              execution_time_ms: Math.round(executionTimeMs),
+              error_message: errorMessage,
+              passed_test_cases: passedTestCases,
+              total_test_cases: totalTestCases,
+              submitted_at: now
+            })
+            .select()
+            .single();
+
+          if (inserted?.id) {
+            submission.id = inserted.id;
+          }
+          if (subError) {
+            console.warn('Supabase submission insert error:', subError);
+          }
+
+          // If accepted, update user_question_progress and leaderboard_scores
+          if (status === 'accepted') {
+            // Upsert progress
+            await this.supabase.clientInstance
+              .from('user_question_progress')
+              .upsert({
+                user_id: userId,
+                question_id: questionId,
+                status: 'solved',
+                attempt_count: 1,
+                best_execution_time_ms: Math.round(executionTimeMs),
+                first_solved_at: now,
+                last_attempted_at: now
+              }, { onConflict: 'user_id,question_id' });
+
+            // Fetch question points and difficulty
+            const { data: qData } = await this.supabase.clientInstance
+              .from('questions')
+              .select('difficulty, points')
+              .eq('id', questionId)
+              .maybeSingle();
+
+            const qDiff = qData?.difficulty || 'medium';
+            const qPoints = qData?.points || 10;
+
+            // Fetch current leaderboard score
+            const { data: lbScore } = await this.supabase.clientInstance
+              .from('leaderboard_scores')
+              .select('*')
+              .eq('user_id', userId)
+              .maybeSingle();
+
+            const isEasy = qDiff === 'easy' ? 1 : 0;
+            const isMed = qDiff === 'medium' ? 1 : 0;
+            const isHard = qDiff === 'hard' ? 1 : 0;
+
+            const newTotalSolved = (lbScore?.total_solved || 0) + 1;
+            const newTotalPoints = (lbScore?.total_points || 0) + qPoints;
+            const newEasy = (lbScore?.easy_solved || 0) + isEasy;
+            const newMed = (lbScore?.medium_solved || 0) + isMed;
+            const newHard = (lbScore?.hard_solved || 0) + isHard;
+            const newStreak = Math.max((lbScore?.current_streak || 0), 1);
+
+            await this.supabase.clientInstance
+              .from('leaderboard_scores')
+              .upsert({
+                user_id: userId,
+                total_solved: newTotalSolved,
+                easy_solved: newEasy,
+                medium_solved: newMed,
+                hard_solved: newHard,
+                total_points: newTotalPoints,
+                current_streak: newStreak,
+                updated_at: now
+              }, { onConflict: 'user_id' });
+
+            // Update streak & last_active_date in profiles
+            await this.supabase.clientInstance
+              .from('profiles')
+              .update({
+                current_streak: newStreak,
+                last_active_date: now.split('T')[0],
+                updated_at: now
+              })
+              .eq('id', userId);
+          }
+        }
+      } catch (remoteErr) {
+        console.warn('Remote sync error in recordSubmission:', remoteErr);
+      }
+    }
+
     return submission;
   }
 
   async getUserSubmissions(userId: string, questionId?: string): Promise<Submission[]> {
-    if (!this.supabase.isDemoMode && this.supabase.clientInstance) {
+    const localAll = this.getLocal<Submission[]>(this.STORAGE_SUBMISSIONS_KEY, []);
+    const localFiltered = localAll.filter(
+      s => s.user_id === userId && (!questionId || s.question_id === questionId)
+    );
+
+    if (!this.supabase.isDemoMode && this.supabase.clientInstance && userId) {
       try {
         let q = this.supabase.clientInstance
           .from('submissions')
@@ -248,16 +359,21 @@ export class DataService {
         }
         const { data, error } = await q;
         if (!error && data) {
-          return data;
+          // Merge remote and local submissions so nothing is lost
+          const remoteIds = new Set(data.map((s: any) => s.id));
+          const merged = [
+            ...data,
+            ...localFiltered.filter(ls => !remoteIds.has(ls.id))
+          ];
+          return merged.sort(
+            (a, b) => new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime()
+          );
         }
       } catch (err) {
         console.warn('Error fetching submissions from Supabase:', err);
       }
     }
-    const all = this.getLocal<Submission[]>(this.STORAGE_SUBMISSIONS_KEY, []);
-    return all.filter(
-      s => s.user_id === userId && (!questionId || s.question_id === questionId)
-    );
+    return localFiltered;
   }
 
   async getAdminMetrics(): Promise<{
@@ -389,8 +505,31 @@ export class DataService {
   }
 
   async getUserProgress(userId: string): Promise<UserQuestionProgress[]> {
-    const all = this.getLocal<UserQuestionProgress[]>(this.STORAGE_PROGRESS_KEY, []);
-    return all.filter(p => p.user_id === userId);
+    const localProgress = this.getLocal<UserQuestionProgress[]>(this.STORAGE_PROGRESS_KEY, []).filter(
+      p => p.user_id === userId
+    );
+
+    if (!this.supabase.isDemoMode && this.supabase.clientInstance && userId) {
+      try {
+        const { data, error } = await this.supabase.clientInstance
+          .from('user_question_progress')
+          .select('*')
+          .eq('user_id', userId);
+
+        if (!error && data) {
+          const remoteQuestionIds = new Set(data.map((p: any) => p.question_id));
+          const merged = [
+            ...data,
+            ...localProgress.filter(lp => !remoteQuestionIds.has(lp.question_id))
+          ];
+          return merged;
+        }
+      } catch (err) {
+        console.warn('Error fetching user progress from Supabase:', err);
+      }
+    }
+
+    return localProgress;
   }
 
   private updateProgressAndStreak(
@@ -434,68 +573,80 @@ export class DataService {
   async getLeaderboard(): Promise<LeaderboardScore[]> {
     if (!this.supabase.isDemoMode && this.supabase.clientInstance) {
       try {
-        const [scoresRes, profilesRes] = await Promise.all([
+        const [scoresRes, profilesRes, progressRes, questionsRes] = await Promise.all([
           this.supabase.clientInstance
             .from('leaderboard_scores')
-            .select('*')
-            .order('total_points', { ascending: false }),
+            .select('*'),
           this.supabase.clientInstance
             .from('profiles')
+            .select('*'),
+          this.supabase.clientInstance
+            .from('user_question_progress')
             .select('*')
+            .eq('status', 'solved'),
+          this.supabase.clientInstance
+            .from('questions')
+            .select('id, difficulty, points')
         ]);
 
         const profileMap = new Map((profilesRes.data || []).map((p: any) => [p.id, p]));
-        const scores = scoresRes.data || [];
+        const questionsMap = new Map((questionsRes.data || []).map((q: any) => [q.id, q]));
+        const scoresMap = new Map((scoresRes.data || []).map((s: any) => [s.user_id, s]));
 
-        if (scores.length > 0) {
-          return scores.map((s: any, idx: number) => {
-            const prof = profileMap.get(s.user_id);
-            return {
-              id: s.id,
-              user_id: s.user_id,
-              total_solved: s.total_solved || 0,
-              easy_solved: s.easy_solved || 0,
-              medium_solved: s.medium_solved || 0,
-              hard_solved: s.hard_solved || 0,
-              total_points: s.total_points || 0,
-              current_streak: s.current_streak || 0,
-              rank_position: idx + 1,
-              updated_at: s.updated_at,
-              profile: prof || {
-                id: s.user_id,
-                username: `user_${s.user_id.substring(0, 6)}`,
-                full_name: 'SQL Solver',
-                avatar_url: null,
-                bio: null,
-                current_streak: s.current_streak || 0,
-                max_streak: s.current_streak || 0,
-                last_active_date: null,
-                created_at: s.updated_at,
-                updated_at: s.updated_at
-              }
-            };
-          });
+        // Calculate actual solved stats per user from user_question_progress for bulletproof accuracy
+        const userProgressStats = new Map<string, { total: number; easy: number; medium: number; hard: number; points: number }>();
+        for (const prog of (progressRes.data || [])) {
+          const stats = userProgressStats.get(prog.user_id) || { total: 0, easy: 0, medium: 0, hard: 0, points: 0 };
+          stats.total += 1;
+          const q = questionsMap.get(prog.question_id);
+          const diff = q?.difficulty || 'medium';
+          if (diff === 'easy') stats.easy += 1;
+          else if (diff === 'hard') stats.hard += 1;
+          else stats.medium += 1;
+          stats.points += (q?.points || 10);
+          userProgressStats.set(prog.user_id, stats);
         }
 
-        // If leaderboard_scores is empty or not yet rolled up, show real registered practitioners from profiles
         const profiles = profilesRes.data || [];
-        if (profiles.length > 0) {
-          return profiles.map((p: any, idx: number) => ({
-            id: `lb_${p.id}`,
-            user_id: p.id,
-            total_solved: 0,
-            easy_solved: 0,
-            medium_solved: 0,
-            hard_solved: 0,
-            total_points: 0,
-            current_streak: p.current_streak || 0,
-            rank_position: idx + 1,
-            updated_at: p.updated_at || new Date().toISOString(),
-            profile: p
-          }));
-        }
+        const result: LeaderboardScore[] = profiles.map((p: any) => {
+          const scoreRow = scoresMap.get(p.id);
+          const computedStats = userProgressStats.get(p.id) || { total: 0, easy: 0, medium: 0, hard: 0, points: 0 };
 
-        return [];
+          const totalSolved = Math.max(scoreRow?.total_solved || 0, computedStats.total);
+          const totalPoints = Math.max(scoreRow?.total_points || 0, computedStats.points);
+          const easySolved = Math.max(scoreRow?.easy_solved || 0, computedStats.easy);
+          const mediumSolved = Math.max(scoreRow?.medium_solved || 0, computedStats.medium);
+          const hardSolved = Math.max(scoreRow?.hard_solved || 0, computedStats.hard);
+          const streak = Math.max(scoreRow?.current_streak || 0, p.current_streak || 0);
+
+          return {
+            id: scoreRow?.id || `lb_${p.id}`,
+            user_id: p.id,
+            total_solved: totalSolved,
+            easy_solved: easySolved,
+            medium_solved: mediumSolved,
+            hard_solved: hardSolved,
+            total_points: totalPoints,
+            current_streak: streak,
+            rank_position: 1,
+            updated_at: scoreRow?.updated_at || p.updated_at || new Date().toISOString(),
+            profile: p
+          };
+        });
+
+        // Sort by total_points DESC, then total_solved DESC, then current_streak DESC
+        result.sort((a, b) => {
+          if (b.total_points !== a.total_points) return b.total_points - a.total_points;
+          if (b.total_solved !== a.total_solved) return b.total_solved - a.total_solved;
+          return (b.current_streak || 0) - (a.current_streak || 0);
+        });
+
+        // Assign ranks
+        result.forEach((item, idx) => {
+          item.rank_position = idx + 1;
+        });
+
+        return result;
       } catch (err) {
         console.warn('Error fetching leaderboard from Supabase:', err);
       }

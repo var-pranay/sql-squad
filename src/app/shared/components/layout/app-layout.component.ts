@@ -13,7 +13,12 @@ import { StreakBadgeComponent } from '../badges/streak-badge.component';
     <div class="app-layout">
       <header class="app-navbar">
         <div class="navbar-left">
-          <button type="button" class="mobile-toggle-btn" (click)="toggleSidebar()">
+          <button
+            type="button"
+            class="sidebar-toggle-btn"
+            (click)="toggleSidebar()"
+            [attr.aria-label]="isSidebarCollapsed() ? 'Expand sidebar' : 'Collapse sidebar'"
+            [title]="isSidebarCollapsed() ? 'Expand sidebar' : 'Collapse sidebar'">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="3" y1="12" x2="21" y2="12"/>
               <line x1="3" y1="6" x2="21" y2="6"/>
@@ -99,7 +104,10 @@ import { StreakBadgeComponent } from '../badges/streak-badge.component';
         @if (sidebarOpen()) {
           <div class="sidebar-backdrop" (click)="closeMobileSidebar()"></div>
         }
-        <aside class="app-sidebar" [class.mobile-open]="sidebarOpen()">
+        <aside
+          class="app-sidebar"
+          [class.mobile-open]="sidebarOpen()"
+          [class.desktop-collapsed]="isSidebarCollapsed()">
           <div class="sidebar-section">
             <span class="sidebar-heading">Practice</span>
             <nav class="sidebar-nav">
@@ -237,16 +245,21 @@ import { StreakBadgeComponent } from '../badges/streak-badge.component';
       gap: 1rem;
     }
 
-    .mobile-toggle-btn {
-      display: none;
+    .sidebar-toggle-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
       background: transparent;
-      border: none;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
       color: var(--text-primary);
       cursor: pointer;
-      padding: 0.25rem;
+      padding: 0.35rem 0.45rem;
+      transition: background-color 150ms ease, border-color 150ms ease;
 
-      @media (max-width: 900px) {
-        display: block;
+      &:hover {
+        background-color: var(--bg-hover);
+        border-color: var(--border-medium);
       }
     }
 
@@ -439,7 +452,17 @@ import { StreakBadgeComponent } from '../badges/streak-badge.component';
       flex-direction: column;
       justify-content: space-between;
       padding: 1.25rem 0.75rem;
-      transition: transform 200ms ease;
+      transition: width 200ms cubic-bezier(0.4, 0, 0.2, 1), padding 200ms ease, opacity 150ms ease;
+      overflow-x: hidden;
+      white-space: nowrap;
+
+      &.desktop-collapsed {
+        width: 0;
+        padding: 0;
+        border-right: none;
+        opacity: 0;
+        pointer-events: none;
+      }
 
       @media (max-width: 900px) {
         position: fixed;
@@ -447,7 +470,18 @@ import { StreakBadgeComponent } from '../badges/streak-badge.component';
         bottom: 0;
         left: 0;
         z-index: 30;
+        width: 250px;
+        opacity: 1;
+        pointer-events: auto;
         transform: translateX(-100%);
+        transition: transform 250ms ease;
+
+        &.desktop-collapsed {
+          width: 250px;
+          padding: 1.25rem 0.75rem;
+          opacity: 1;
+          pointer-events: auto;
+        }
 
         &.mobile-open {
           transform: translateX(0);
@@ -541,10 +575,23 @@ export class AppLayoutComponent {
   router = inject(Router);
 
   sidebarOpen = signal<boolean>(false);
+  isSidebarCollapsed = signal<boolean>(
+    typeof localStorage !== 'undefined' && localStorage.getItem('sql_squad_sidebar_collapsed') === 'true'
+  );
   showUserMenu = signal<boolean>(false);
 
   toggleSidebar(): void {
-    this.sidebarOpen.update(v => !v);
+    if (typeof window !== 'undefined' && window.innerWidth <= 900) {
+      this.sidebarOpen.update(v => !v);
+    } else {
+      this.isSidebarCollapsed.update(v => {
+        const next = !v;
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem('sql_squad_sidebar_collapsed', String(next));
+        }
+        return next;
+      });
+    }
   }
 
   closeMobileSidebar(): void {

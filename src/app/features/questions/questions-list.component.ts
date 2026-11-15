@@ -31,19 +31,26 @@ import { DifficultyBadgeComponent } from '../../shared/components/badges/difficu
               type="text"
               class="form-control search-input"
               placeholder="Search SQL questions by title, keywords or schema..."
-              [(ngModel)]="searchQuery"
+              [ngModel]="searchQuery()"
+              (ngModelChange)="searchQuery.set($event)"
             />
           </div>
 
           <div class="select-filters">
-            <select class="form-select select-pill" [(ngModel)]="selectedDifficulty">
+            <select
+              class="form-select select-pill"
+              [ngModel]="selectedDifficulty()"
+              (ngModelChange)="selectedDifficulty.set($event)">
               <option value="all">All Difficulties</option>
               <option value="easy">Easy</option>
               <option value="medium">Medium</option>
               <option value="hard">Hard</option>
             </select>
 
-            <select class="form-select select-pill" [(ngModel)]="selectedStatus">
+            <select
+              class="form-select select-pill"
+              [ngModel]="selectedStatus()"
+              (ngModelChange)="selectedStatus.set($event)">
               <option value="all">All Statuses</option>
               <option value="solved">Solved</option>
               <option value="attempted">Attempted</option>
@@ -314,35 +321,39 @@ export class QuestionsListComponent implements OnInit {
   topics = signal<Topic[]>([]);
   userProgress = signal<UserQuestionProgress[]>([]);
 
-  searchQuery = '';
-  selectedDifficulty = 'all';
-  selectedStatus = 'all';
+  searchQuery = signal<string>('');
+  selectedDifficulty = signal<string>('all');
+  selectedStatus = signal<string>('all');
   selectedTopic = signal<string>('all');
 
   filteredQuestions = computed(() => {
     let list = this.questions();
 
-    if (this.selectedTopic() !== 'all') {
-      list = list.filter(q => q.topic?.slug === this.selectedTopic());
+    const topic = this.selectedTopic();
+    if (topic !== 'all') {
+      list = list.filter(q => q.topic?.slug === topic || q.topic_id === topic);
     }
 
-    if (this.selectedDifficulty !== 'all') {
-      list = list.filter(q => q.difficulty === this.selectedDifficulty);
+    const diff = this.selectedDifficulty();
+    if (diff !== 'all') {
+      list = list.filter(q => q.difficulty === diff);
     }
 
-    if (this.selectedStatus !== 'all') {
+    const stat = this.selectedStatus();
+    if (stat !== 'all') {
       const progressMap = new Map(this.userProgress().map(p => [p.question_id, p.status]));
       list = list.filter(q => {
         const status = progressMap.get(q.id) || 'unattempted';
-        return status === this.selectedStatus;
+        return status === stat;
       });
     }
 
-    if (this.searchQuery.trim().length > 0) {
-      const q = this.searchQuery.toLowerCase();
+    const q = this.searchQuery().trim().toLowerCase();
+    if (q.length > 0) {
       list = list.filter(item =>
         item.title.toLowerCase().includes(q) ||
-        item.slug.toLowerCase().includes(q)
+        item.slug.toLowerCase().includes(q) ||
+        (item.description_markdown && item.description_markdown.toLowerCase().includes(q))
       );
     }
 

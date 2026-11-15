@@ -39,6 +39,20 @@ import { ThemeService } from '../../../core/services/theme.service';
           <span class="shortcut-tip">Press <kbd>Ctrl</kbd> + <kbd>Enter</kbd> to Run</span>
         </div>
         <div class="header-actions">
+          <!-- Run Query Button (Always visible with highest priority) -->
+          <button
+            type="button"
+            class="btn btn-primary btn-sm run-btn"
+            (click)="onRun()"
+            [disabled]="isRunning"
+            title="Execute SQL Query (Ctrl + Enter)">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+              <polygon points="5 3 19 12 5 21 5 3"/>
+            </svg>
+            <span class="run-text-full">{{ isRunning ? 'Running...' : 'Run Query' }}</span>
+            <span class="run-text-short">{{ isRunning ? '...' : 'Run' }}</span>
+          </button>
+
           <!-- Direct Copy Code Button -->
           <button
             type="button"
@@ -49,13 +63,13 @@ import { ThemeService } from '../../../core/services/theme.service';
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5">
                 <polyline points="20 6 9 17 4 12"/>
               </svg>
-              <span class="copied-text">Copied!</span>
+              <span class="btn-label-text copied-text">Copied!</span>
             } @else {
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
                 <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
               </svg>
-              <span>Copy</span>
+              <span class="btn-label-text">Copy</span>
             }
           </button>
 
@@ -69,7 +83,7 @@ import { ThemeService } from '../../../core/services/theme.service';
               <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
               <path d="M3 3v5h5"/>
             </svg>
-            <span>Reset</span>
+            <span class="btn-label-text">Reset</span>
           </button>
 
           <!-- Maximize / Restore Toggle Button (Desktop) -->
@@ -83,27 +97,14 @@ import { ThemeService } from '../../../core/services/theme.service';
                 <polyline points="4 14 10 14 10 20"/>
                 <polyline points="20 10 14 10 14 4"/>
               </svg>
-              <span>Restore</span>
+              <span class="btn-label-text">Restore</span>
             } @else {
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="15 3 21 3 21 9"/>
                 <polyline points="9 21 3 21 3 15"/>
               </svg>
-              <span>Expand</span>
+              <span class="btn-label-text">Expand</span>
             }
-          </button>
-
-          <!-- Run Query Button -->
-          <button
-            type="button"
-            class="btn btn-primary btn-sm run-btn"
-            (click)="onRun()"
-            [disabled]="isRunning">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
-              <polygon points="5 3 19 12 5 21 5 3"/>
-            </svg>
-            <span class="run-text-full">{{ isRunning ? 'Running...' : 'Run Query' }}</span>
-            <span class="run-text-short">{{ isRunning ? '...' : 'Run' }}</span>
           </button>
         </div>
       </div>
@@ -131,6 +132,13 @@ import { ThemeService } from '../../../core/services/theme.service';
       gap: 0.5rem;
       flex-wrap: nowrap;
       flex-shrink: 0;
+      min-width: 0;
+      overflow-x: auto;
+      scrollbar-width: none;
+
+      &::-webkit-scrollbar {
+        display: none;
+      }
 
       @media (max-width: 600px) {
         padding: 0.35rem 0.45rem;
@@ -142,7 +150,8 @@ import { ThemeService } from '../../../core/services/theme.service';
       display: flex;
       align-items: center;
       gap: 0.65rem;
-      flex-shrink: 0;
+      flex-shrink: 1;
+      min-width: 0;
     }
 
     .dialect-badge {
@@ -155,8 +164,9 @@ import { ThemeService } from '../../../core/services/theme.service';
       background-color: var(--accent-primary-subtle);
       padding: 0.2rem 0.5rem;
       border-radius: var(--radius-sm);
+      flex-shrink: 0;
 
-      @media (max-width: 480px) {
+      @media (max-width: 600px) {
         font-size: 0.7rem;
         padding: 0.2rem 0.35rem;
 
@@ -169,8 +179,9 @@ import { ThemeService } from '../../../core/services/theme.service';
     .shortcut-tip {
       font-size: 0.75rem;
       color: var(--text-muted);
+      white-space: nowrap;
 
-      @media (max-width: 768px) {
+      @media (max-width: 1280px) {
         display: none;
       }
 
@@ -191,6 +202,20 @@ import { ThemeService } from '../../../core/services/theme.service';
 
       @media (max-width: 480px) {
         gap: 0.25rem;
+      }
+    }
+
+    .run-btn {
+      flex-shrink: 0;
+      font-weight: 700;
+      box-shadow: 0 1px 4px rgba(2, 132, 199, 0.4);
+    }
+
+    @media (max-width: 1150px) {
+      .copy-btn .btn-label-text,
+      .reset-btn .btn-label-text,
+      .maximize-btn .btn-label-text {
+        display: none;
       }
     }
 
