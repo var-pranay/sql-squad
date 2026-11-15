@@ -211,7 +211,15 @@ export class DataService {
     totalTestCases: number,
     errorMessage: string | null = null
   ): Promise<Submission> {
-    const submissionId = `sub_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const isCryptoUuidAvailable = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function';
+    const submissionId = isCryptoUuidAvailable
+      ? crypto.randomUUID()
+      : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+          const r = (Math.random() * 16) | 0;
+          const v = c === 'x' ? r : (r & 0x3) | 0x8;
+          return v.toString(16);
+        });
+
     const now = new Date().toISOString();
 
     const submission: Submission = {
@@ -227,7 +235,7 @@ export class DataService {
       submitted_at: now
     };
 
-    // 1. Always update local storage
+    // 1. Update local storage with unique submission
     const submissions = this.getLocal<Submission[]>(this.STORAGE_SUBMISSIONS_KEY, []);
     submissions.unshift(submission);
     this.setLocal(this.STORAGE_SUBMISSIONS_KEY, submissions);
@@ -242,10 +250,11 @@ export class DataService {
         const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(questionId);
 
         if (isUuid) {
-          // Insert submission record into Supabase
+          // Insert submission record into Supabase with identical UUID
           const { data: inserted, error: subError } = await this.supabase.clientInstance
             .from('submissions')
             .insert({
+              id: submissionId,
               user_id: userId,
               question_id: questionId,
               query_sql: querySql,
@@ -268,65 +277,79 @@ export class DataService {
 
           // If accepted, update user_question_progress and leaderboard_scores
           if (status === 'accepted') {
-            // Upsert progress
+            // Check if this question was ALREADY solved previously by this user!
+            const { data: existingProg } = await this.supabase.clientInstance
+              .from('user_question_progress')
+              .select('status, attempt_count, best_execution_time_ms, first_solved_at')
+              .eq('user_id', userId)
+              .eq('question_id', questionId)
+              .maybeSingle();
+
+            const wasAlreadySolved = existingProg?.status === 'solved';
+
+            // Upsert progress with correct attempt count
             await this.supabase.clientInstance
               .from('user_question_progress')
               .upsert({
                 user_id: userId,
                 question_id: questionId,
                 status: 'solved',
-                attempt_count: 1,
-                best_execution_time_ms: Math.round(executionTimeMs),
-                first_solved_at: now,
+                attempt_count: (existingProg?.attempt_count || 0) + 1,
+                best_execution_time_ms: Math.min(
+                  existingProg?.best_execution_time_ms || Infinity,
+                  Math.round(executionTimeMs)
+                ),
+                first_solved_at: existingProg?.first_solved_at || now,
                 last_attempted_at: now
               }, { onConflict: 'user_id,question_id' });
 
-            // Fetch question points and difficulty
-            const { data: qData } = await this.supabase.clientInstance
-              .from('questions')
-              .select('difficulty, points')
-              .eq('id', questionId)
-              .maybeSingle();
+            // ONLY award points, total_solved, and difficulty breakdown if NOT already solved!
+            if (!wasAlreadySolved) {
+              const { data: qData } = await this.supabase.clientInstance
+                .from('questions')
+                .select('difficulty, points')
+                .eq('id', questionId)
+                .maybeSingle();
 
-            const qDiff = qData?.difficulty || 'medium';
-            const qPoints = qData?.points || 10;
+              const qDiff = qData?.difficulty || 'medium';
+              const qPoints = qData?.points || 10;
 
-            // Fetch current leaderboard score
-            const { data: lbScore } = await this.supabase.clientInstance
-              .from('leaderboard_scores')
-              .select('*')
-              .eq('user_id', userId)
-              .maybeSingle();
+              // Fetch current leaderboard score
+              const { data: lbScore } = await this.supabase.clientInstance
+                .from('leaderboard_scores')
+                .select('*')
+                .eq('user_id', userId)
+                .maybeSingle();
 
-            const isEasy = qDiff === 'easy' ? 1 : 0;
-            const isMed = qDiff === 'medium' ? 1 : 0;
-            const isHard = qDiff === 'hard' ? 1 : 0;
+              const isEasy = qDiff === 'easy' ? 1 : 0;
+              const isMed = qDiff === 'medium' ? 1 : 0;
+              const isHard = qDiff === 'hard' ? 1 : 0;
 
-            const newTotalSolved = (lbScore?.total_solved || 0) + 1;
-            const newTotalPoints = (lbScore?.total_points || 0) + qPoints;
-            const newEasy = (lbScore?.easy_solved || 0) + isEasy;
-            const newMed = (lbScore?.medium_solved || 0) + isMed;
-            const newHard = (lbScore?.hard_solved || 0) + isHard;
-            const newStreak = Math.max((lbScore?.current_streak || 0), 1);
+              const newTotalSolved = (lbScore?.total_solved || 0) + 1;
+              const newTotalPoints = (lbScore?.total_points || 0) + qPoints;
+              const newEasy = (lbScore?.easy_solved || 0) + isEasy;
+              const newMed = (lbScore?.medium_solved || 0) + isMed;
+              const newHard = (lbScore?.hard_solved || 0) + isHard;
+              const newStreak = Math.max((lbScore?.current_streak || 0), 1);
 
-            await this.supabase.clientInstance
-              .from('leaderboard_scores')
-              .upsert({
-                user_id: userId,
-                total_solved: newTotalSolved,
-                easy_solved: newEasy,
-                medium_solved: newMed,
-                hard_solved: newHard,
-                total_points: newTotalPoints,
-                current_streak: newStreak,
-                updated_at: now
-              }, { onConflict: 'user_id' });
+              await this.supabase.clientInstance
+                .from('leaderboard_scores')
+                .upsert({
+                  user_id: userId,
+                  total_solved: newTotalSolved,
+                  easy_solved: newEasy,
+                  medium_solved: newMed,
+                  hard_solved: newHard,
+                  total_points: newTotalPoints,
+                  current_streak: newStreak,
+                  updated_at: now
+                }, { onConflict: 'user_id' });
+            }
 
             // Update streak & last_active_date in profiles
             await this.supabase.clientInstance
               .from('profiles')
               .update({
-                current_streak: newStreak,
                 last_active_date: now.split('T')[0],
                 updated_at: now
               })
@@ -359,12 +382,19 @@ export class DataService {
         }
         const { data, error } = await q;
         if (!error && data) {
-          // Merge remote and local submissions so nothing is lost
+          // Strictly deduplicate: Filter out local copies that match remote ID or identical query within 15 seconds
           const remoteIds = new Set(data.map((s: any) => s.id));
-          const merged = [
-            ...data,
-            ...localFiltered.filter(ls => !remoteIds.has(ls.id))
-          ];
+          const uniqueLocal = localFiltered.filter(ls => {
+            if (remoteIds.has(ls.id)) return false;
+            const duplicateInRemote = data.some((rs: any) =>
+              rs.question_id === ls.question_id &&
+              rs.query_sql?.trim() === ls.query_sql?.trim() &&
+              Math.abs(new Date(rs.submitted_at).getTime() - new Date(ls.submitted_at).getTime()) < 15000
+            );
+            return !duplicateInRemote;
+          });
+
+          const merged = [...data, ...uniqueLocal];
           return merged.sort(
             (a, b) => new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime()
           );
@@ -612,11 +642,12 @@ export class DataService {
           const scoreRow = scoresMap.get(p.id);
           const computedStats = userProgressStats.get(p.id) || { total: 0, easy: 0, medium: 0, hard: 0, points: 0 };
 
-          const totalSolved = Math.max(scoreRow?.total_solved || 0, computedStats.total);
-          const totalPoints = Math.max(scoreRow?.total_points || 0, computedStats.points);
-          const easySolved = Math.max(scoreRow?.easy_solved || 0, computedStats.easy);
-          const mediumSolved = Math.max(scoreRow?.medium_solved || 0, computedStats.medium);
-          const hardSolved = Math.max(scoreRow?.hard_solved || 0, computedStats.hard);
+          // Use computed distinct progress stats as ground truth so repeat submissions on same question never inflate XP
+          const totalSolved = computedStats.total > 0 ? computedStats.total : (scoreRow?.total_solved || 0);
+          const totalPoints = computedStats.total > 0 ? computedStats.points : (scoreRow?.total_points || 0);
+          const easySolved = computedStats.total > 0 ? computedStats.easy : (scoreRow?.easy_solved || 0);
+          const mediumSolved = computedStats.total > 0 ? computedStats.medium : (scoreRow?.medium_solved || 0);
+          const hardSolved = computedStats.total > 0 ? computedStats.hard : (scoreRow?.hard_solved || 0);
           const streak = Math.max(scoreRow?.current_streak || 0, p.current_streak || 0);
 
           return {

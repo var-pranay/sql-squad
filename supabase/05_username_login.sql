@@ -1,6 +1,6 @@
 -- ==============================================================================
--- SQL SQUAD - USERNAME LOGIN SUPPORT
--- Allows logging in with either Email OR Username
+-- SQL SQUAD - USERNAME LOGIN & AUTH RECOVERY SUPPORT
+-- Allows logging in with either Email OR Username & Password Recovery Validation
 -- ==============================================================================
 
 -- 1. Ensure public.profiles table has an email column (optional convenience)
@@ -32,5 +32,21 @@ BEGIN
 END;
 $$;
 
--- 4. Grant execute permission so login page can resolve username
+-- 4. Security Definer RPC to check if an email is registered (for forgot-password validation)
+CREATE OR REPLACE FUNCTION public.check_email_exists(p_email TEXT)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, auth
+AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1 FROM auth.users
+        WHERE lower(email) = lower(trim(p_email))
+    );
+END;
+$$;
+
+-- 5. Grant execute permissions to anon, authenticated and service_role
 GRANT EXECUTE ON FUNCTION public.get_email_by_username(TEXT) TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.check_email_exists(TEXT) TO anon, authenticated, service_role;

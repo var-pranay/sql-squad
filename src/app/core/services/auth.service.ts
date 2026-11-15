@@ -236,27 +236,71 @@ export class AuthService {
     username: string,
     fullName: string
   ): Promise<{ success: boolean; error?: string }> {
-    this.rememberUserIdentifier(username, email);
+    const cleanEmail = email.toLowerCase().trim();
+    const cleanUsername = username.trim();
 
     if (!this.supabase.isDemoMode && this.supabase.clientInstance) {
+      // 1. Check if username is already taken
+      try {
+        const { data: existingUser } = await this.supabase.clientInstance
+          .from('profiles')
+          .select('id, username')
+          .ilike('username', cleanUsername)
+          .maybeSingle();
+
+        if (existingUser) {
+          return {
+            success: false,
+            error: `Username "${cleanUsername}" is already taken. Please choose another username.`
+          };
+        }
+      } catch (e) {
+        console.warn('Username availability check error:', e);
+      }
+
+      // 2. Check if email already registered via RPC if available
+      try {
+        const { data: emailExists } = await this.supabase.clientInstance
+          .rpc('check_email_exists', { p_email: cleanEmail });
+        if (emailExists === true) {
+          return {
+            success: false,
+            error: 'An account with this email address already exists. Please sign in instead.'
+          };
+        }
+      } catch (e) {
+        // RPC might not exist yet
+      }
+
+      // 3. Attempt SignUp with Supabase
       const { data, error } = await this.supabase.clientInstance.auth.signUp({
-        email,
+        email: cleanEmail,
         password: pass,
         options: {
           data: {
-            username,
-            full_name: fullName
+            username: cleanUsername,
+            full_name: fullName.trim()
           }
         }
       });
       if (error) return { success: false, error: error.message };
 
+      // Supabase returns an empty identities array if user with this email already exists
+      if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+        return {
+          success: false,
+          error: 'An account with this email address already exists. Please sign in instead.'
+        };
+      }
+
+      this.rememberUserIdentifier(cleanUsername, cleanEmail);
+
       if (data.user) {
         try {
           await this.supabase.clientInstance.from('profiles').upsert({
             id: data.user.id,
-            username: username || email.split('@')[0],
-            full_name: fullName || username,
+            username: cleanUsername || cleanEmail.split('@')[0],
+            full_name: fullName.trim() || cleanUsername,
             current_streak: 0,
             max_streak: 0
           });
@@ -271,23 +315,41 @@ export class AuthService {
 
       const user: AuthUser = {
         id: data.user?.id || `user_${Date.now()}`,
-        email,
-        username,
+        email: cleanEmail,
+        username: cleanUsername,
         role: 'user'
       };
       this.saveSession(user);
       return { success: true };
     }
 
+    // Demo Mode: Check local users to prevent duplicates
+    const known = this.getKnownUsers();
+    if (known[cleanUsername.toLowerCase()]) {
+      return {
+        success: false,
+        error: `Username "${cleanUsername}" is already taken. Please choose another username.`
+      };
+    }
+    const duplicateEmail = Object.entries(known).find(([, e]) => e.toLowerCase() === cleanEmail);
+    if (duplicateEmail) {
+      return {
+        success: false,
+        error: 'An account with this email address already exists. Please sign in instead.'
+      };
+    }
+
+    this.rememberUserIdentifier(cleanUsername, cleanEmail);
+
     const user: AuthUser = {
       id: `user_${Date.now()}`,
-      email,
-      username,
+      email: cleanEmail,
+      username: cleanUsername,
       role: 'user',
       profile: {
         id: `user_${Date.now()}`,
-        username,
-        full_name: fullName,
+        username: cleanUsername,
+        full_name: fullName.trim(),
         avatar_url: null,
         bio: 'New SQL solver',
         current_streak: 1,
@@ -299,6 +361,82 @@ export class AuthService {
     };
 
     this.saveSession(user);
+    return { success: true };
+  }
+
+  async sendPasswordReset(identifier: string): Promise<{ success: boolean; error?: string }> {
+    const raw = identifier.trim();
+    let emailToUse = raw.toLowerCase();
+
+    if (!this.supabase.isDemoMode && this.supabase.clientInstance) {
+      // If a username was entered instead of email, resolve it
+      if (!raw.includes('@')) {
+        let resolved: string | null = null;
+        try {
+          const { data: rpcEmail } = await this.supabase.clientInstance
+            .rpc('get_email_by_username', { p_username: raw });
+          if (rpcEmail) resolved = rpcEmail;
+        } catch {}
+
+        if (!resolved) {
+          const known = this.getKnownUsers();
+          resolved = known[raw.toLowerCase()] || null;
+        }
+
+        if (resolved) {
+          emailToUse = resolved.toLowerCase();
+        } else {
+          return {
+            success: false,
+            error: `No registered account found with username "${raw}". Please enter your registered email address.`
+          };
+        }
+      }
+
+      // Check if this email exists in system before sending
+      try {
+        const { data: exists } = await this.supabase.clientInstance
+          .rpc('check_email_exists', { p_email: emailToUse });
+        if (exists === false) {
+          return {
+            success: false,
+            error: `The email address "${emailToUse}" is not registered. Please check the spelling or create an account.`
+          };
+        }
+      } catch (err) {
+        // Fallback: check profiles table
+        try {
+          const { data: prof } = await this.supabase.clientInstance
+            .from('profiles')
+            .select('email')
+            .eq('email', emailToUse)
+            .maybeSingle();
+
+          const known = this.getKnownUsers();
+          const isKnownLocally = Object.values(known).some(e => e.toLowerCase() === emailToUse);
+
+          if (!prof && !isKnownLocally) {
+            console.info('Email presence check check completed.');
+          }
+        } catch {}
+      }
+
+      const redirectTo = typeof window !== 'undefined'
+        ? `${window.location.origin}/auth/login`
+        : 'https://sql-squad.vercel.app/auth/login';
+
+      const { error } = await this.supabase.clientInstance.auth.resetPasswordForEmail(emailToUse, {
+        redirectTo
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      return { success: true };
+    }
+
+    // Demo Mode
     return { success: true };
   }
 

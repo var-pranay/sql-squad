@@ -216,8 +216,9 @@ import { StreakBadgeComponent } from '../badges/streak-badge.component';
     .app-layout {
       display: flex;
       flex-direction: column;
-      min-height: 100vh;
-      min-height: 100dvh;
+      height: 100vh;
+      height: 100dvh;
+      overflow: hidden;
       background-color: var(--bg-app);
     }
 
@@ -437,10 +438,13 @@ import { StreakBadgeComponent } from '../badges/streak-badge.component';
     .app-body {
       display: flex;
       flex: 1;
-      min-height: calc(100vh - 60px);
+      height: calc(100vh - 60px);
+      max-height: calc(100vh - 60px);
+      overflow: hidden;
 
       @media (max-width: 900px) {
-        min-height: calc(100dvh - 52px);
+        height: calc(100dvh - 52px);
+        max-height: calc(100dvh - 52px);
       }
     }
 
@@ -551,20 +555,22 @@ import { StreakBadgeComponent } from '../badges/streak-badge.component';
 
     .app-content {
       flex: 1;
-      padding: 0.85rem 1.25rem;
+      padding: 0.75rem 1rem;
       max-width: 1600px;
       width: 100%;
       margin: 0 auto;
       overflow-y: auto;
       display: flex;
       flex-direction: column;
+      height: 100%;
+      min-height: 0;
 
       @media (max-width: 900px) {
-        padding: 0.4rem 0.5rem;
+        padding: 0.35rem 0.5rem;
       }
 
       @media (max-width: 600px) {
-        padding: 0.3rem 0.4rem;
+        padding: 0.25rem 0.35rem;
       }
     }
   `]

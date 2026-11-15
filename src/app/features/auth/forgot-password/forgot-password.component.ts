@@ -2,6 +2,7 @@ import { Component, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { RouterModule } from '@angular/router';
+import { AuthService } from '../../../core/services/auth.service';
 
 @Component({
   selector: 'app-forgot-password',
@@ -12,8 +13,19 @@ import { RouterModule } from '@angular/router';
       <div class="auth-card card">
         <div class="auth-header">
           <h2>Reset Password</h2>
-          <p>Enter your email to receive a password recovery link.</p>
+          <p>Enter your registered email or username to receive a password recovery link.</p>
         </div>
+
+        @if (errorMessage()) {
+          <div class="auth-error-alert">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="12" y1="8" x2="12" y2="12"/>
+              <line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            <span>{{ errorMessage() }}</span>
+          </div>
+        }
 
         @if (isSent()) {
           <div class="success-alert">
@@ -29,18 +41,21 @@ import { RouterModule } from '@angular/router';
         } @else {
           <form [formGroup]="forgotForm" (ngSubmit)="onSubmit()" class="auth-form">
             <div class="form-group">
-              <label class="form-label" for="email">Email Address</label>
+              <label class="form-label" for="email">Registered Email Address or Username</label>
               <input
                 id="email"
-                type="email"
+                type="text"
                 class="form-control"
-                placeholder="you@domain.com"
+                placeholder="you@domain.com or username"
                 formControlName="email"
               />
+              @if (forgotForm.get('email')?.touched && forgotForm.get('email')?.invalid) {
+                <span class="form-error">Please enter a valid email or username.</span>
+              }
             </div>
 
             <button type="submit" class="btn btn-primary submit-btn" [disabled]="forgotForm.invalid || isLoading()">
-              {{ isLoading() ? 'Sending...' : 'Send Reset Link' }}
+              {{ isLoading() ? 'Validating & Sending...' : 'Send Recovery Link' }}
             </button>
           </form>
         }
@@ -88,6 +103,19 @@ import { RouterModule } from '@angular/router';
         font-size: 0.85rem;
         color: var(--text-secondary);
       }
+    }
+
+    .auth-error-alert {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1rem;
+      background-color: var(--accent-danger-subtle);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      border-radius: var(--radius-sm);
+      color: var(--accent-danger);
+      font-size: 0.825rem;
+      margin-bottom: 1.25rem;
     }
 
     .success-alert {
@@ -143,19 +171,30 @@ import { RouterModule } from '@angular/router';
 })
 export class ForgotPasswordComponent {
   private fb = inject(FormBuilder);
+  private auth = inject(AuthService);
+
   isLoading = signal<boolean>(false);
   isSent = signal<boolean>(false);
+  errorMessage = signal<string | null>(null);
 
   forgotForm = this.fb.group({
-    email: ['', [Validators.required, Validators.email]]
+    email: ['', [Validators.required]]
   });
 
   async onSubmit(): Promise<void> {
     if (this.forgotForm.invalid) return;
+
     this.isLoading.set(true);
-    setTimeout(() => {
-      this.isLoading.set(false);
+    this.errorMessage.set(null);
+
+    const val = this.forgotForm.value.email!.trim();
+    const res = await this.auth.sendPasswordReset(val);
+
+    this.isLoading.set(false);
+    if (res.success) {
       this.isSent.set(true);
-    }, 700);
+    } else {
+      this.errorMessage.set(res.error || 'Failed to send recovery link. Please try again.');
+    }
   }
 }

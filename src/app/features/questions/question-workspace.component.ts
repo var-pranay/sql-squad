@@ -17,7 +17,7 @@ import { DifficultyBadgeComponent } from '../../shared/components/badges/difficu
 type LeftTab = 'description' | 'schema' | 'hints' | 'submissions';
 type RightTab = 'results' | 'testcases';
 type MobileTab = 'description' | 'editor' | 'results';
-type RightPaneViewMode = 'split' | 'editor' | 'output';
+type RightPaneViewMode = 'editor' | 'output';
 
 @Component({
   selector: 'app-question-workspace',
@@ -318,149 +318,129 @@ type RightPaneViewMode = 'split' | 'editor' | 'output';
             </div>
           </div>
 
-          <!-- RIGHT PANE: Code Editor (Top) & Output / Test Cases (Bottom) -->
-          <div class="pane right-pane" [class]="'pane-mode-' + rightPaneMode()">
-            <!-- DESKTOP WORKSPACE VIEW TOGGLE TOOLBAR -->
-            <div class="workspace-layout-bar">
-              <span class="layout-hint">View Mode:</span>
-              <div class="layout-btn-group">
-                <button
-                  type="button"
-                  class="layout-switch-btn"
-                  [class.active]="rightPaneMode() === 'split'"
-                  (click)="setRightPaneMode('split')"
-                  title="Split View (Editor + Output stacked)">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <rect x="3" y="3" width="18" height="18" rx="2"/>
-                    <line x1="3" y1="12" x2="21" y2="12"/>
-                  </svg>
-                  <span>Split View</span>
-                </button>
-                <button
-                  type="button"
-                  class="layout-switch-btn"
-                  [class.active]="rightPaneMode() === 'editor'"
-                  (click)="setRightPaneMode('editor')"
-                  title="Maximize Editor (Hide Output Window)">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <rect x="3" y="3" width="18" height="18" rx="2"/>
-                    <polyline points="15 3 21 3 21 9"/>
-                    <polyline points="9 21 3 21 3 15"/>
-                  </svg>
-                  <span>Editor Max</span>
-                </button>
-                <button
-                  type="button"
-                  class="layout-switch-btn"
-                  [class.active]="rightPaneMode() === 'output'"
-                  (click)="setRightPaneMode('output')"
-                  title="Maximize Output Window">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <rect x="3" y="3" width="18" height="18" rx="2"/>
-                    <line x1="3" y1="9" x2="21" y2="9"/>
-                    <line x1="9" y1="21" x2="9" y2="9"/>
-                  </svg>
-                  <span>Output Max</span>
-                </button>
-              </div>
+          <!-- RIGHT PANE: Code Editor OR Output / Test Cases -->
+          <div class="pane right-pane card" [class]="'pane-mode-' + rightPaneMode()">
+            <!-- RIGHT PANE VIEW TABS -->
+            <div class="pane-tabs right-pane-tabs">
+              <button
+                type="button"
+                class="pane-tab"
+                [class.active]="rightPaneMode() === 'editor'"
+                (click)="setRightPaneMode('editor')">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="16 18 22 12 16 6"/>
+                  <polyline points="8 6 2 12 8 18"/>
+                </svg>
+                <span>SQL Editor</span>
+              </button>
+              <button
+                type="button"
+                class="pane-tab"
+                [class.active]="rightPaneMode() === 'output'"
+                (click)="setRightPaneMode('output')">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                  <line x1="3" y1="9" x2="21" y2="9"/>
+                  <line x1="9" y1="21" x2="9" y2="9"/>
+                </svg>
+                <span>Output & Test Cases</span>
+                @if (evaluationResult()) {
+                  <span class="tab-indicator" [class.pass]="evaluationResult()!.status === 'accepted'" [class.fail]="evaluationResult()!.status !== 'accepted'"></span>
+                }
+              </button>
             </div>
 
-            <div class="editor-section">
-              <app-sql-editor
-                [initialCode]="userCode"
-                [starterCode]="starterTemplateCode()"
-                [isRunning]="isRunningQuery()"
-                [isMaximized]="rightPaneMode() === 'editor'"
-                (codeChange)="onCodeChange($event)"
-                (runRequested)="runQuery($event)"
-                (resetRequested)="onResetEditor()"
-                (toggleMaximizeRequested)="toggleEditorMaximize()">
-              </app-sql-editor>
-            </div>
-
-            <div class="console-section card">
-              <div class="pane-tabs console-tabs">
-                <div class="console-tabs-left">
-                  <button
-                    type="button"
-                    class="pane-tab"
-                    [class.active]="activeRightTab() === 'results'"
-                    (click)="activeRightTab.set('results')">
-                    Execution Output
-                  </button>
-                  <button
-                    type="button"
-                    class="pane-tab"
-                    [class.active]="activeRightTab() === 'testcases'"
-                    (click)="activeRightTab.set('testcases')">
-                    Test Cases ({{ question()!.test_cases?.length || 0 }})
-                  </button>
-                </div>
-                <div class="console-tabs-right">
-                  <button
-                    type="button"
-                    class="btn btn-outline btn-xs console-toggle-btn"
-                    (click)="toggleOutputMaximize()"
-                    [title]="rightPaneMode() === 'output' ? 'Restore Split View' : 'Maximize Output Window'">
-                    @if (rightPaneMode() === 'output') {
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/></svg>
-                      <span>Restore Split</span>
-                    } @else {
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/></svg>
-                      <span>Maximize</span>
-                    }
-                  </button>
-                </div>
+            @if (rightPaneMode() === 'editor') {
+              <div class="editor-section">
+                <app-sql-editor
+                  [initialCode]="userCode"
+                  [starterCode]="starterTemplateCode()"
+                  [isRunning]="isRunningQuery()"
+                  (codeChange)="onCodeChange($event)"
+                  (runRequested)="runQuery($event)"
+                  (resetRequested)="onResetEditor()">
+                </app-sql-editor>
               </div>
+            } @else {
+              <div class="console-section">
+                <div class="console-sub-bar">
+                  <div class="console-tabs-left">
+                    <button
+                      type="button"
+                      class="sub-tab-btn"
+                      [class.active]="activeRightTab() === 'results'"
+                      (click)="activeRightTab.set('results')">
+                      Query Output
+                    </button>
+                    <button
+                      type="button"
+                      class="sub-tab-btn"
+                      [class.active]="activeRightTab() === 'testcases'"
+                      (click)="activeRightTab.set('testcases')">
+                      Test Cases ({{ question()!.test_cases?.length || 0 }})
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    class="btn btn-outline btn-xs back-to-editor-btn"
+                    (click)="setRightPaneMode('editor')"
+                    title="Switch back to SQL Editor">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="15 18 9 12 15 6"/>
+                    </svg>
+                    <span>Back to Editor</span>
+                  </button>
+                </div>
 
-              <div class="console-body">
-                @if (activeRightTab() === 'results') {
-                  <app-sql-results-table
-                    [result]="queryResult()"
-                    [isLoading]="isRunningQuery()">
-                  </app-sql-results-table>
-                } @else if (activeRightTab() === 'testcases') {
-                  <div class="testcases-view">
-                    @for (tc of question()!.test_cases; track tc.id; let idx = $index) {
-                      <div class="testcase-card">
-                        <div class="tc-header">
-                          <span class="tc-title">Test Case {{ idx + 1 }}: {{ tc.test_name }}</span>
-                          @if (getTestCaseResult(tc.id); as result) {
-                            <span class="tc-status" [class.passed]="result.passed" [class.failed]="!result.passed">
-                              {{ result.passed ? 'Passed' : 'Failed' }}
-                            </span>
+                <div class="console-body">
+                  @if (activeRightTab() === 'results') {
+                    <app-sql-results-table
+                      [result]="queryResult()"
+                      [isLoading]="isRunningQuery()">
+                    </app-sql-results-table>
+                  } @else if (activeRightTab() === 'testcases') {
+                    <div class="testcases-view">
+                      @for (tc of question()!.test_cases; track tc.id; let idx = $index) {
+                        <div class="testcase-card">
+                          <div class="tc-header">
+                            <span class="tc-title">Test Case {{ idx + 1 }}: {{ tc.test_name }}</span>
+                            @if (getTestCaseResult(tc.id); as result) {
+                              <span class="tc-status" [class.passed]="result.passed" [class.failed]="!result.passed">
+                                {{ result.passed ? 'Passed' : 'Failed' }}
+                              </span>
+                            }
+                          </div>
+                          <div class="tc-expected-query">
+                            <div class="tc-expected-header">
+                              <span class="tc-label">Reference Query:</span>
+                              <button
+                                type="button"
+                                class="btn btn-outline btn-xs copy-btn"
+                                (click)="copyText(tc.expected_query, 'tc-' + tc.id)"
+                                title="Copy Reference Query">
+                                @if (copiedKey() === 'tc-' + tc.id) {
+                                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                                  <span class="text-success">Copied!</span>
+                                } @else {
+                                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                  <span>Copy</span>
+                                }
+                              </button>
+                            </div>
+                            <pre class="tc-code"><code>{{ tc.expected_query }}</code></pre>
+                          </div>
+                          @if (getTestCaseResult(tc.id)?.diffMessage; as diff) {
+                            <div class="tc-diff-alert">
+                              {{ diff }}
+                            </div>
                           }
                         </div>
-                        <div class="tc-expected-query">
-                          <div class="tc-expected-header">
-                            <span class="tc-label">Reference Query:</span>
-                            <button
-                              type="button"
-                              class="btn btn-outline btn-xs copy-btn"
-                              (click)="copyText(tc.expected_query, 'tc-' + tc.id)"
-                              title="Copy Reference Query">
-                              @if (copiedKey() === 'tc-' + tc.id) {
-                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-                                <span class="text-success">Copied!</span>
-                              } @else {
-                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                                <span>Copy</span>
-                              }
-                            </button>
-                          </div>
-                          <code>{{ tc.expected_query }}</code>
-                        </div>
-                        @if (getTestCaseResult(tc.id)?.diffMessage; as diff) {
-                          <div class="tc-diff-alert">
-                            {{ diff }}
-                          </div>
-                        }
-                      </div>
-                    }
-                  </div>
-                }
+                      }
+                    </div>
+                  }
+                </div>
               </div>
-            </div>
+            }
           </div>
         </div>
       }
@@ -778,6 +758,11 @@ type RightPaneViewMode = 'split' | 'editor' | 'output';
       border: 1px solid var(--border-subtle);
       border-radius: var(--radius-md);
       overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      max-height: 100%;
+      min-height: 0;
     }
 
     .pane-tabs {
@@ -789,6 +774,9 @@ type RightPaneViewMode = 'split' | 'editor' | 'output';
     }
 
     .pane-tab {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
       background: transparent;
       border: none;
       padding: 0.55rem 0.9rem;
@@ -812,162 +800,92 @@ type RightPaneViewMode = 'split' | 'editor' | 'output';
     }
 
     .pane-content {
-      flex: 1;
+      flex: 1 1 0;
       overflow-y: auto;
+      overflow-x: hidden;
       padding: 1rem 1.25rem;
       min-height: 0;
+      max-height: 100%;
     }
 
     .right-pane {
       display: flex;
       flex-direction: column;
-      gap: 0.5rem;
       flex: 1;
       min-height: 0;
+      height: 100%;
+      max-height: 100%;
       overflow: hidden;
-
-      &.pane-mode-split {
-        .editor-section {
-          flex: 66;
-          min-height: 180px;
-          display: flex;
-          flex-direction: column;
-          overflow: hidden;
-        }
-        .console-section {
-          flex: 34;
-          min-height: 140px;
-          display: flex;
-          flex-direction: column;
-          overflow: hidden;
-          background-color: var(--bg-primary);
-          border: 1px solid var(--border-subtle);
-          border-radius: var(--radius-md);
-        }
-      }
-
-      &.pane-mode-editor {
-        .editor-section {
-          flex: 1;
-          height: 100%;
-          min-height: 0;
-          display: flex;
-          flex-direction: column;
-          overflow: hidden;
-        }
-        .console-section {
-          display: none !important;
-        }
-      }
-
-      &.pane-mode-output {
-        .editor-section {
-          display: none !important;
-        }
-        .console-section {
-          flex: 1;
-          height: 100%;
-          min-height: 0;
-          display: flex;
-          flex-direction: column;
-          overflow: hidden;
-          background-color: var(--bg-primary);
-          border: 1px solid var(--border-subtle);
-          border-radius: var(--radius-md);
-        }
-      }
-    }
-
-    .workspace-layout-bar {
-      display: flex;
-      align-items: center;
-      justify-content: flex-end;
-      gap: 0.5rem;
-      padding: 0.25rem 0.6rem;
       background-color: var(--bg-primary);
       border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-sm);
-      flex-shrink: 0;
+      border-radius: var(--radius-md);
 
-      @media (max-width: 1024px) {
-        display: none;
+      .editor-section {
+        flex: 1 1 0;
+        height: 100%;
+        min-height: 0;
+        max-height: 100%;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
       }
 
-      .layout-hint {
-        font-size: 0.725rem;
-        font-weight: 600;
-        color: var(--text-muted);
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
-      }
-
-      .layout-btn-group {
-        display: inline-flex;
-        background-color: var(--bg-secondary);
-        border: 1px solid var(--border-subtle);
-        border-radius: var(--radius-xs);
-        padding: 2px;
-        gap: 2px;
-      }
-
-      .layout-switch-btn {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.35rem;
-        background: transparent;
-        border: none;
-        color: var(--text-secondary);
-        font-size: 0.75rem;
-        font-weight: 600;
-        padding: 0.2rem 0.55rem;
-        border-radius: 3px;
-        cursor: pointer;
-        transition: all 120ms ease;
-
-        &:hover {
-          color: var(--text-primary);
-          background-color: var(--bg-hover);
-        }
-
-        &.active {
-          color: var(--accent-sky);
-          background-color: var(--bg-primary);
-          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
-        }
+      .console-section {
+        flex: 1 1 0;
+        height: 100%;
+        min-height: 0;
+        max-height: 100%;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
       }
     }
 
-    .console-tabs {
+    .console-sub-bar {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      flex-shrink: 0;
+      padding: 0.4rem 0.75rem;
       background-color: var(--bg-secondary);
       border-bottom: 1px solid var(--border-subtle);
-      padding-right: 0.5rem;
+      flex-shrink: 0;
+    }
 
-      .console-tabs-left {
-        display: flex;
-        overflow-x: auto;
+    .console-tabs-left {
+      display: flex;
+      gap: 0.4rem;
+    }
+
+    .sub-tab-btn {
+      background: transparent;
+      border: 1px solid transparent;
+      padding: 0.3rem 0.7rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      border-radius: var(--radius-xs);
+      cursor: pointer;
+      transition: all 120ms ease;
+
+      &:hover {
+        color: var(--text-primary);
+        background-color: var(--bg-hover);
       }
 
-      .console-tabs-right {
-        display: flex;
-        align-items: center;
-        gap: 0.35rem;
-
-        @media (max-width: 1024px) {
-          display: none;
-        }
+      &.active {
+        color: var(--accent-sky);
+        background-color: var(--bg-primary);
+        border-color: var(--border-medium);
       }
     }
 
-    .console-toggle-btn {
+    .back-to-editor-btn {
       display: inline-flex;
       align-items: center;
-      gap: 0.3rem;
-      padding: 0.2rem 0.45rem;
-      font-size: 0.725rem;
+      gap: 0.35rem;
+      padding: 0.25rem 0.6rem;
+      font-size: 0.775rem;
+      font-weight: 600;
     }
 
     .console-body {
@@ -1100,6 +1018,7 @@ type RightPaneViewMode = 'split' | 'editor' | 'output';
       display: flex;
       flex-direction: column;
       gap: 0.75rem;
+      padding-bottom: 1.5rem;
     }
 
     .past-submission-card {
@@ -1278,7 +1197,7 @@ export class QuestionWorkspaceComponent implements OnInit {
   activeLeftTab = signal<LeftTab>('description');
   activeRightTab = signal<RightTab>('results');
   mobileView = signal<MobileTab>('description');
-  rightPaneMode = signal<RightPaneViewMode>('split');
+  rightPaneMode = signal<RightPaneViewMode>('editor');
 
   isRunningQuery = signal<boolean>(false);
   isEvaluating = signal<boolean>(false);
@@ -1334,24 +1253,12 @@ export class QuestionWorkspaceComponent implements OnInit {
     this.rightPaneMode.set(mode);
   }
 
-  toggleEditorMaximize(): void {
-    this.rightPaneMode.update(m => m === 'editor' ? 'split' : 'editor');
-  }
-
-  toggleOutputMaximize(): void {
-    this.rightPaneMode.update(m => m === 'output' ? 'split' : 'output');
-  }
-
   async runQuery(sqlQuery: string): Promise<void> {
     if (!this.question()?.dataset) return;
 
     this.isRunningQuery.set(true);
     this.activeRightTab.set('results');
-
-    // If editor was maximized, restore split so output is visible
-    if (this.rightPaneMode() === 'editor') {
-      this.rightPaneMode.set('split');
-    }
+    this.rightPaneMode.set('output');
 
     // On mobile devices, automatically switch to results tab so output is instantly visible
     if (typeof window !== 'undefined' && window.innerWidth <= 1024) {
@@ -1384,10 +1291,8 @@ export class QuestionWorkspaceComponent implements OnInit {
     if (!q || !q.dataset) return;
 
     this.isEvaluating.set(true);
-
-    if (this.rightPaneMode() === 'editor') {
-      this.rightPaneMode.set('split');
-    }
+    this.activeRightTab.set('testcases');
+    this.rightPaneMode.set('output');
 
     // On mobile devices, switch to results/tests tab
     if (typeof window !== 'undefined' && window.innerWidth <= 1024) {
