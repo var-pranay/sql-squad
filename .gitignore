@@ -41,3 +41,4 @@ src/assets/pglite.*
 # System files
 .DS_Store
 Thumbs.db
+.vercel

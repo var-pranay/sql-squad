@@ -9,7 +9,8 @@ import {
   OnDestroy,
   OnChanges,
   SimpleChanges,
-  inject
+  inject,
+  signal
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { EditorView, basicSetup } from 'codemirror';
@@ -38,18 +39,49 @@ import { ThemeService } from '../../../core/services/theme.service';
           <span class="shortcut-tip">Press <kbd>Ctrl</kbd> + <kbd>Enter</kbd> to Run</span>
         </div>
         <div class="header-actions">
-          <button type="button" class="btn btn-outline btn-sm" (click)="resetCode()" title="Reset query to template">
+          <!-- Direct Copy Code Button -->
+          <button
+            type="button"
+            class="btn btn-outline btn-sm copy-btn"
+            (click)="copyCode()"
+            title="Copy SQL Query to Clipboard">
+            @if (isCopied()) {
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+              <span class="copied-text">Copied!</span>
+            } @else {
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+              </svg>
+              <span>Copy</span>
+            }
+          </button>
+
+          <!-- Functional Reset Button -->
+          <button
+            type="button"
+            class="btn btn-outline btn-sm reset-btn"
+            (click)="resetCode()"
+            title="Reset query back to original starter template">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
               <path d="M3 3v5h5"/>
             </svg>
-            Reset
+            <span>Reset</span>
           </button>
-          <button type="button" class="btn btn-primary btn-sm" (click)="onRun()" [disabled]="isRunning">
+
+          <!-- Run Query Button -->
+          <button
+            type="button"
+            class="btn btn-primary btn-sm run-btn"
+            (click)="onRun()"
+            [disabled]="isRunning">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
               <polygon points="5 3 19 12 5 21 5 3"/>
             </svg>
-            {{ isRunning ? 'Running...' : 'Run Query' }}
+            <span>{{ isRunning ? 'Running...' : 'Run Query' }}</span>
           </button>
         </div>
       </div>
@@ -71,17 +103,22 @@ import { ThemeService } from '../../../core/services/theme.service';
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0.5rem 0.85rem;
+      padding: 0.45rem 0.75rem;
       background-color: var(--bg-primary);
       border-bottom: 1px solid var(--border-subtle);
       gap: 0.5rem;
       flex-wrap: wrap;
+      flex-shrink: 0;
+
+      @media (max-width: 600px) {
+        padding: 0.4rem 0.5rem;
+      }
     }
 
     .header-left {
       display: flex;
       align-items: center;
-      gap: 0.75rem;
+      gap: 0.65rem;
     }
 
     .dialect-badge {
@@ -94,6 +131,11 @@ import { ThemeService } from '../../../core/services/theme.service';
       background-color: var(--accent-primary-subtle);
       padding: 0.2rem 0.5rem;
       border-radius: var(--radius-sm);
+
+      @media (max-width: 480px) {
+        font-size: 0.7rem;
+        padding: 0.15rem 0.4rem;
+      }
     }
 
     .shortcut-tip {
@@ -116,7 +158,25 @@ import { ThemeService } from '../../../core/services/theme.service';
     .header-actions {
       display: flex;
       align-items: center;
-      gap: 0.5rem;
+      gap: 0.4rem;
+    }
+
+    .btn-sm {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.3rem 0.65rem;
+      font-size: 0.775rem;
+
+      @media (max-width: 480px) {
+        padding: 0.25rem 0.45rem;
+        font-size: 0.725rem;
+      }
+    }
+
+    .copied-text {
+      color: #10b981;
+      font-weight: 600;
     }
 
     .editor-container {
@@ -131,10 +191,14 @@ export class SqlEditorComponent implements AfterViewInit, OnDestroy, OnChanges {
   @ViewChild('editorHost', { static: true }) editorHost!: ElementRef<HTMLDivElement>;
 
   @Input() initialCode: string = '-- Write your PostgreSQL query here\n';
+  @Input() starterCode: string = '';
   @Input() isRunning: boolean = false;
 
   @Output() codeChange = new EventEmitter<string>();
   @Output() runRequested = new EventEmitter<string>();
+  @Output() resetRequested = new EventEmitter<void>();
+
+  isCopied = signal<boolean>(false);
 
   private themeService = inject(ThemeService);
   private editorView: EditorView | null = null;
@@ -145,6 +209,7 @@ export class SqlEditorComponent implements AfterViewInit, OnDestroy, OnChanges {
   }
 
   ngOnChanges(changes: SimpleChanges): void {
+    // Only update if external component explicitly pushed a different code
     if (changes['initialCode'] && !changes['initialCode'].firstChange && this.editorView) {
       const current = this.editorView.state.doc.toString();
       if (current !== this.initialCode) {
@@ -189,7 +254,7 @@ export class SqlEditorComponent implements AfterViewInit, OnDestroy, OnChanges {
           }
         }),
         EditorView.theme({
-          '&': { height: '100%', fontSize: '14px' },
+          '&': { height: '100%', fontSize: '13.5px' },
           '.cm-scroller': { overflow: 'auto', fontFamily: 'var(--font-mono)' },
           '.cm-content': { padding: '12px 0' },
           '.cm-line': { padding: '0 16px' }
@@ -208,12 +273,32 @@ export class SqlEditorComponent implements AfterViewInit, OnDestroy, OnChanges {
   }
 
   resetCode(): void {
-    if (this.editorView) {
+    // Determine the baseline starter code (not the typed dirty code)
+    const target = this.starterCode?.trim() ? this.starterCode : this.initialCode;
+    if (this.editorView && target) {
       this.editorView.dispatch({
-        changes: { from: 0, to: this.editorView.state.doc.length, insert: this.initialCode }
+        changes: { from: 0, to: this.editorView.state.doc.length, insert: target }
       });
-      this.codeChange.emit(this.initialCode);
+      this.codeChange.emit(target);
+      this.resetRequested.emit();
     }
+  }
+
+  copyCode(): void {
+    const code = this.getCode();
+    if (!code) return;
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(code);
+    } else {
+      const el = document.createElement('textarea');
+      el.value = code;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand('copy');
+      document.body.removeChild(el);
+    }
+    this.isCopied.set(true);
+    setTimeout(() => this.isCopied.set(false), 1600);
   }
 
   onRun(): void {

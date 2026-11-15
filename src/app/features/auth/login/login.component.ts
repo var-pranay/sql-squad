@@ -67,13 +67,20 @@ import { AuthService } from '../../../core/services/auth.service';
           </div>
 
           <div class="quick-credentials">
-            <span class="quick-title">Quick Demo Login:</span>
+            <span class="quick-title">⚡ Instant Demo Access:</span>
             <div class="quick-buttons">
-              <button type="button" class="btn btn-outline btn-sm" (click)="fillCredentials('alex@sqlsquad.dev', 'User123!')">
-                Solver Account
+              <button type="button" class="btn btn-outline btn-sm demo-btn" (click)="demoLogin('user')" [disabled]="isLoading()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                  <circle cx="12" cy="7" r="4"/>
+                </svg>
+                Sign in as Student / User
               </button>
-              <button type="button" class="btn btn-outline btn-sm" (click)="fillCredentials('admin@sqlsquad.dev', 'Admin123!')">
-                Admin Account
+              <button type="button" class="btn btn-outline btn-sm demo-btn admin-demo" (click)="demoLogin('admin')" [disabled]="isLoading()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                </svg>
+                Sign in as Admin
               </button>
             </div>
           </div>
@@ -213,9 +220,15 @@ export class LoginComponent {
   errorMessage = signal<string | null>(null);
 
   loginForm = this.fb.group({
-    email: ['alex@sqlsquad.dev', [Validators.required, Validators.email]],
-    password: ['Password123!', [Validators.required, Validators.minLength(6)]]
+    email: ['', [Validators.required, Validators.email]],
+    password: ['', [Validators.required, Validators.minLength(6)]]
   });
+
+  async demoLogin(role: 'user' | 'admin'): Promise<void> {
+    this.isLoading.set(true);
+    await this.auth.loginAsDemo(role);
+    this.isLoading.set(false);
+  }
 
   fillCredentials(email: string, pass: string): void {
     this.loginForm.patchValue({ email, password: pass });

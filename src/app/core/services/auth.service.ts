@@ -43,25 +43,35 @@ export class AuthService {
       }
     }
 
-    const defaultUser: AuthUser = {
-      id: 'demo-user-1',
-      email: 'alex@sqlsquad.dev',
-      username: 'alex_codes',
-      role: 'user',
+    // Do NOT auto-authenticate new visitors: require login first
+    this.currentUser.set(null);
+  }
+
+  async loginAsDemo(role: 'user' | 'admin'): Promise<void> {
+    const user: AuthUser = {
+      id: role === 'admin' ? 'demo-admin-1' : 'demo-user-1',
+      email: role === 'admin' ? 'admin@sqlsquad.dev' : 'alex@sqlsquad.dev',
+      username: role === 'admin' ? 'admin_boss' : 'alex_codes',
+      role,
       profile: {
-        id: 'demo-user-1',
-        username: 'alex_codes',
-        full_name: 'Alex Rivera',
+        id: role === 'admin' ? 'demo-admin-1' : 'demo-user-1',
+        username: role === 'admin' ? 'admin_boss' : 'alex_codes',
+        full_name: role === 'admin' ? 'Platform Administrator' : 'Alex Rivera',
         avatar_url: null,
-        bio: 'Building query mastery one day at a time.',
-        current_streak: 4,
-        max_streak: 11,
+        bio: role === 'admin' ? 'Managing SQL challenges' : 'Software Engineer',
+        current_streak: role === 'admin' ? 12 : 4,
+        max_streak: role === 'admin' ? 25 : 11,
         last_active_date: '2026-11-14',
-        created_at: '2026-02-15T00:00:00Z',
+        created_at: '2026-01-01T00:00:00Z',
         updated_at: '2026-11-14T00:00:00Z'
       }
     };
-    this.saveSession(defaultUser);
+    this.saveSession(user);
+    if (role === 'admin') {
+      this.router.navigate(['/admin']);
+    } else {
+      this.router.navigate(['/dashboard']);
+    }
   }
 
   async login(email: string, pass: string): Promise<{ success: boolean; error?: string }> {

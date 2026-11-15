@@ -1,4 +1,4 @@
-import { Component, Input } from '@angular/core';
+import { Component, Input, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { SqlQueryResult } from '../../../core/models/database.types';
 
@@ -19,13 +19,27 @@ import { SqlQueryResult } from '../../../core/models/database.types';
         </div>
         <div class="toolbar-right">
           @if (result && !result.error && result.rows.length > 0) {
+            <button type="button" class="btn btn-outline btn-sm copy-btn" (click)="copyJson()" title="Copy results as JSON">
+              @if (copiedJson()) {
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+                <span class="text-success">Copied!</span>
+              } @else {
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                </svg>
+                <span>Copy JSON</span>
+              }
+            </button>
             <button type="button" class="btn btn-outline btn-sm" (click)="exportCsv()" title="Download CSV">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                 <polyline points="7 10 12 15 17 10"/>
                 <line x1="12" y1="15" x2="12" y2="3"/>
               </svg>
-              Export CSV
+              <span>Export CSV</span>
             </button>
           }
         </div>
@@ -275,6 +289,8 @@ export class SqlResultsTableComponent {
   @Input() result: SqlQueryResult | null = null;
   @Input() isLoading: boolean = false;
 
+  copiedJson = signal<boolean>(false);
+
   getStatusTitle(): string {
     if (this.isLoading) return 'Executing...';
     if (!this.result) return 'Console Ready';
@@ -286,6 +302,23 @@ export class SqlResultsTableComponent {
     if (val === null || val === undefined) return 'NULL';
     if (typeof val === 'object') return JSON.stringify(val);
     return String(val);
+  }
+
+  copyJson(): void {
+    if (!this.result || this.result.rows.length === 0) return;
+    const jsonStr = JSON.stringify(this.result.rows, null, 2);
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(jsonStr);
+    } else {
+      const el = document.createElement('textarea');
+      el.value = jsonStr;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand('copy');
+      document.body.removeChild(el);
+    }
+    this.copiedJson.set(true);
+    setTimeout(() => this.copiedJson.set(false), 1600);
   }
 
   exportCsv(): void {

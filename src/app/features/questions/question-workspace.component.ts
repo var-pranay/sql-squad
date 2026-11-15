@@ -197,10 +197,43 @@ type MobileTab = 'description' | 'editor' | 'results';
                   <div class="schema-intro">
                     <p>The following tables and columns are pre-loaded in your sandbox environment:</p>
                   </div>
-                  <pre class="schema-ddl-code"><code>{{ question()!.dataset?.schema_ddl }}</code></pre>
+                  <div class="code-box-wrapper">
+                    <div class="code-box-header">
+                      <span class="code-box-title">Schema DDL</span>
+                      <button
+                        type="button"
+                        class="btn btn-outline btn-xs copy-btn"
+                        (click)="copyText(question()!.dataset?.schema_ddl, 'ddl')"
+                        title="Copy Schema DDL">
+                        @if (copiedKey() === 'ddl') {
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                          <span class="text-success">Copied!</span>
+                        } @else {
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                          <span>Copy DDL</span>
+                        }
+                      </button>
+                    </div>
+                    <pre class="schema-ddl-code"><code>{{ question()!.dataset?.schema_ddl }}</code></pre>
+                  </div>
 
                   <div class="seed-preview">
-                    <h4>Sample Seed Data Preview</h4>
+                    <div class="code-box-header">
+                      <span class="code-box-title">Sample Seed Data Preview</span>
+                      <button
+                        type="button"
+                        class="btn btn-outline btn-xs copy-btn"
+                        (click)="copyText(question()!.dataset?.seed_data_sql, 'seed')"
+                        title="Copy Seed SQL">
+                        @if (copiedKey() === 'seed') {
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                          <span class="text-success">Copied!</span>
+                        } @else {
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                          <span>Copy Seed SQL</span>
+                        }
+                      </button>
+                    </div>
                     <pre class="schema-ddl-code"><code>{{ question()!.dataset?.seed_data_sql }}</code></pre>
                   </div>
                 </div>
@@ -238,9 +271,24 @@ type MobileTab = 'description' | 'editor' | 'results';
                           <span class="sub-meta">{{ sub.execution_time_ms }}ms · {{ formatTime(sub.submitted_at) }}</span>
                         </div>
                         <pre class="sub-code"><code>{{ sub.query_sql }}</code></pre>
-                        <button type="button" class="btn btn-outline btn-sm restore-btn" (click)="restoreQuery(sub.query_sql)">
-                          Restore Code
-                        </button>
+                        <div class="sub-actions">
+                          <button type="button" class="btn btn-outline btn-sm restore-btn" (click)="restoreQuery(sub.query_sql)">
+                            Restore Code
+                          </button>
+                          <button
+                            type="button"
+                            class="btn btn-outline btn-sm copy-btn"
+                            (click)="copyText(sub.query_sql, 'sub-' + sub.id)"
+                            title="Copy Query">
+                            @if (copiedKey() === 'sub-' + sub.id) {
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                              <span class="text-success">Copied!</span>
+                            } @else {
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                              <span>Copy</span>
+                            }
+                          </button>
+                        </div>
                       </div>
                     }
                   }
@@ -254,9 +302,11 @@ type MobileTab = 'description' | 'editor' | 'results';
             <div class="editor-section">
               <app-sql-editor
                 [initialCode]="userCode"
+                [starterCode]="starterTemplateCode()"
                 [isRunning]="isRunningQuery()"
                 (codeChange)="onCodeChange($event)"
-                (runRequested)="runQuery($event)">
+                (runRequested)="runQuery($event)"
+                (resetRequested)="onResetEditor()">
               </app-sql-editor>
             </div>
 
@@ -297,7 +347,22 @@ type MobileTab = 'description' | 'editor' | 'results';
                           }
                         </div>
                         <div class="tc-expected-query">
-                          <span class="tc-label">Reference Query:</span>
+                          <div class="tc-expected-header">
+                            <span class="tc-label">Reference Query:</span>
+                            <button
+                              type="button"
+                              class="btn btn-outline btn-xs copy-btn"
+                              (click)="copyText(tc.expected_query, 'tc-' + tc.id)"
+                              title="Copy Reference Query">
+                              @if (copiedKey() === 'tc-' + tc.id) {
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                                <span class="text-success">Copied!</span>
+                              } @else {
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                <span>Copy</span>
+                              }
+                            </button>
+                          </div>
                           <code>{{ tc.expected_query }}</code>
                         </div>
                         @if (getTestCaseResult(tc.id)?.diffMessage; as diff) {
@@ -694,11 +759,35 @@ type MobileTab = 'description' | 'editor' | 'results';
         margin: 0;
       }
 
-      .schema-ddl-code {
-        background-color: var(--bg-code);
+      .code-box-wrapper {
+        display: flex;
+        flex-direction: column;
         border: 1px solid var(--border-subtle);
         border-radius: var(--radius-sm);
+        overflow: hidden;
+      }
+
+      .code-box-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.35rem 0.65rem;
+        background-color: var(--bg-secondary);
+        border-bottom: 1px solid var(--border-subtle);
+      }
+
+      .code-box-title {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--text-secondary);
+      }
+
+      .schema-ddl-code {
+        background-color: var(--bg-code);
+        border: none;
+        border-radius: 0;
         padding: 0.85rem;
+        margin: 0;
         font-family: var(--font-mono);
         font-size: 0.775rem;
         color: var(--text-primary);
@@ -706,9 +795,12 @@ type MobileTab = 'description' | 'editor' | 'results';
         white-space: pre-wrap;
       }
 
-      .seed-preview h4 {
-        font-size: 0.825rem;
-        margin-bottom: 0.4rem;
+      .seed-preview {
+        display: flex;
+        flex-direction: column;
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--radius-sm);
+        overflow: hidden;
       }
     }
 
@@ -787,6 +879,37 @@ type MobileTab = 'description' | 'editor' | 'results';
         font-size: 0.725rem;
         padding: 0.2rem 0.5rem;
       }
+
+      .sub-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+    }
+
+    .btn-xs {
+      padding: 0.15rem 0.45rem;
+      font-size: 0.7rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+    }
+
+    .copy-btn {
+      color: var(--text-secondary);
+      cursor: pointer;
+      border-radius: var(--radius-xs);
+      transition: all 120ms ease;
+
+      &:hover {
+        color: var(--text-primary);
+        border-color: var(--accent-sky);
+      }
+    }
+
+    .text-success {
+      color: var(--accent-success);
+      font-weight: 600;
     }
 
     .testcases-view {
@@ -833,7 +956,13 @@ type MobileTab = 'description' | 'editor' | 'results';
         color: var(--text-secondary);
         display: flex;
         flex-direction: column;
-        gap: 0.2rem;
+        gap: 0.25rem;
+
+        .tc-expected-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+        }
 
         code {
           background-color: var(--bg-code);
@@ -886,6 +1015,9 @@ export class QuestionWorkspaceComponent implements OnInit {
   isRunningQuery = signal<boolean>(false);
   isEvaluating = signal<boolean>(false);
 
+  starterTemplateCode = signal<string>('');
+  copiedKey = signal<string | null>(null);
+
   userCode: string = '-- Write your SQL query here\n';
   queryResult = signal<SqlQueryResult | null>(null);
   evaluationResult = signal<SubmissionEvaluationResult | null>(null);
@@ -908,6 +1040,12 @@ export class QuestionWorkspaceComponent implements OnInit {
         console.warn('Sandbox init warning:', err);
       });
 
+      // Automatically determine first table name from dataset schema DDL
+      const match = q.dataset.schema_ddl.match(/CREATE\s+TABLE\s+(\w+)/i);
+      const firstTable = match ? match[1] : 'my_table';
+      const starter = `-- SQL Squad Challenge: ${q.title}\n-- Dialect: PostgreSQL 16\n\nSELECT * FROM ${firstTable} LIMIT 10;\n`;
+      this.starterTemplateCode.set(starter);
+
       const userId = this.auth.currentUser()?.id || 'demo-user-1';
       const subs = await this.dataService.getUserSubmissions(userId, q.id);
       this.pastSubmissions.set(subs);
@@ -915,10 +1053,7 @@ export class QuestionWorkspaceComponent implements OnInit {
       if (subs.length > 0) {
         this.userCode = subs[0].query_sql;
       } else {
-        // Automatically determine first table name from dataset schema DDL
-        const match = q.dataset.schema_ddl.match(/CREATE\s+TABLE\s+(\w+)/i);
-        const firstTable = match ? match[1] : 'my_table';
-        this.userCode = `-- SQL Squad Challenge: ${q.title}\n-- Dialect: PostgreSQL 16\n\nSELECT * FROM ${firstTable} LIMIT 10;\n`;
+        this.userCode = starter;
       }
     }
   }
@@ -1023,6 +1158,30 @@ export class QuestionWorkspaceComponent implements OnInit {
     this.userCode = code;
     // On mobile, switch back to editor so user sees their restored code
     this.mobileView.set('editor');
+  }
+
+  onResetEditor(): void {
+    this.userCode = this.starterTemplateCode();
+  }
+
+  copyText(text: string | undefined, key: string): void {
+    if (!text) return;
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(text);
+    } else {
+      const el = document.createElement('textarea');
+      el.value = text;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand('copy');
+      document.body.removeChild(el);
+    }
+    this.copiedKey.set(key);
+    setTimeout(() => {
+      if (this.copiedKey() === key) {
+        this.copiedKey.set(null);
+      }
+    }, 1600);
   }
 
   formatMarkdown(markdown: string): string {

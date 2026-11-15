@@ -37,23 +37,9 @@ import { StreakBadgeComponent } from '../badges/streak-badge.component';
         </div>
 
         <div class="navbar-right">
-          <div class="role-switch-pill" title="Toggle current role for testing">
-            <span class="role-label">Role:</span>
-            <button
-              type="button"
-              class="role-btn"
-              [class.active]="!auth.isAdmin()"
-              (click)="switchRole('user')">
-              User
-            </button>
-            <button
-              type="button"
-              class="role-btn admin"
-              [class.active]="auth.isAdmin()"
-              (click)="switchRole('admin')">
-              Admin
-            </button>
-          </div>
+          @if (auth.isAdmin()) {
+            <span class="admin-indicator-pill">Admin</span>
+          }
 
           @if (auth.currentUser()?.profile?.current_streak; as streak) {
             <app-streak-badge [streak]="streak"></app-streak-badge>
@@ -305,43 +291,15 @@ import { StreakBadgeComponent } from '../badges/streak-badge.component';
       position: relative;
     }
 
-    .role-switch-pill {
-      display: flex;
-      align-items: center;
-      background-color: var(--bg-secondary);
-      border: 1px solid var(--border-medium);
+    .admin-indicator-pill {
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: #ffffff;
+      background: linear-gradient(135deg, #8b5cf6, #6366f1);
+      padding: 0.15rem 0.5rem;
       border-radius: var(--radius-full);
-      padding: 2px 3px;
-      gap: 2px;
-
-      .role-label {
-        font-size: 0.7rem;
-        color: var(--text-muted);
-        padding: 0 0.4rem;
-        font-weight: 600;
-      }
-
-      .role-btn {
-        background: transparent;
-        border: none;
-        color: var(--text-secondary);
-        font-size: 0.75rem;
-        font-weight: 600;
-        padding: 0.2rem 0.55rem;
-        border-radius: var(--radius-full);
-        cursor: pointer;
-        transition: all 120ms ease;
-
-        &.active {
-          background-color: var(--accent-primary);
-          color: #ffffff;
-        }
-
-        &.admin.active {
-          background: linear-gradient(135deg, #8b5cf6, #6366f1);
-          color: #ffffff;
-        }
-      }
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
     }
 
     .user-profile-badge {
