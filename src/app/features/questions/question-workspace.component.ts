@@ -44,33 +44,39 @@ type MobileTab = 'description' | 'editor' | 'results';
       } @else {
         <!-- TOPBAR -->
         <div class="workspace-topbar">
-          <div class="topbar-left">
+          <div class="topbar-row-primary">
             <a routerLink="/questions" class="btn btn-outline btn-sm back-btn" title="Back to Catalog">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <line x1="19" y1="12" x2="5" y2="12"/>
                 <polyline points="12 19 5 12 12 5"/>
               </svg>
-              Catalog
+              <span>Catalog</span>
             </a>
-            <h1 class="question-title">{{ question()!.title }}</h1>
+
+            <div class="topbar-desktop-title">
+              <h1 class="question-title">{{ question()!.title }}</h1>
+            </div>
+
             <div class="badge-group">
               <app-difficulty-badge [difficulty]="question()!.difficulty"></app-difficulty-badge>
               <span class="reward-pill">+{{ question()!.points }} XP</span>
             </div>
-          </div>
 
-          <div class="topbar-right">
             <button
               type="button"
               class="btn btn-success submit-btn"
               (click)="submitSolution()"
               [disabled]="isEvaluating() || isRunningQuery()">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                 <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
                 <polyline points="22 4 12 14.01 9 11.01"/>
               </svg>
-              {{ isEvaluating() ? 'Evaluating...' : 'Submit Solution' }}
+              <span>{{ isEvaluating() ? 'Evaluating...' : 'Submit Solution' }}</span>
             </button>
+          </div>
+
+          <div class="topbar-mobile-title">
+            <h1 class="question-title-mobile">{{ question()!.title }}</h1>
           </div>
         </div>
 
@@ -386,59 +392,79 @@ type MobileTab = 'description' | 'editor' | 'results';
       display: flex;
       flex-direction: column;
       gap: 0.65rem;
-      height: calc(100vh - 84px);
-      max-height: calc(100vh - 84px);
+      height: 100%;
+      max-height: 100%;
+      flex: 1;
+      min-height: 0;
       overflow: hidden;
 
       @media (max-width: 900px) {
-        height: calc(100vh - 78px);
-        max-height: calc(100vh - 78px);
+        gap: 0.35rem;
       }
     }
 
     .workspace-topbar {
       display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      flex-shrink: 0;
+    }
+
+    .topbar-row-primary {
+      display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 0.75rem;
-      flex-wrap: wrap;
-      flex-shrink: 0;
+      gap: 0.5rem;
+      width: 100%;
+    }
 
-      @media (max-width: 640px) {
-        gap: 0.4rem;
+    .topbar-desktop-title {
+      display: flex;
+      align-items: center;
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+
+      @media (max-width: 768px) {
+        display: none;
       }
     }
 
-    .topbar-left {
-      display: flex;
-      align-items: center;
-      gap: 0.65rem;
-      flex-wrap: wrap;
-    }
+    .topbar-mobile-title {
+      display: none;
 
-    .back-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.35rem;
-      padding: 0.25rem 0.6rem;
-      font-size: 0.775rem;
+      @media (max-width: 768px) {
+        display: block;
+        width: 100%;
+      }
     }
 
     .question-title {
       font-size: 1.15rem;
       font-weight: 700;
       margin: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
       letter-spacing: -0.01em;
+    }
 
-      @media (max-width: 640px) {
-        font-size: 0.95rem;
-      }
+    .question-title-mobile {
+      font-size: 0.925rem;
+      font-weight: 700;
+      margin: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      letter-spacing: -0.01em;
+      color: var(--text-primary);
     }
 
     .badge-group {
       display: inline-flex;
       align-items: center;
-      gap: 0.5rem;
+      gap: 0.4rem;
+      flex-shrink: 0;
     }
 
     .reward-pill {
@@ -450,13 +476,28 @@ type MobileTab = 'description' | 'editor' | 'results';
       border-radius: var(--radius-sm);
     }
 
+    .back-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.25rem 0.6rem;
+      font-size: 0.775rem;
+      flex-shrink: 0;
+    }
+
     .submit-btn {
       display: inline-flex;
       align-items: center;
-      gap: 0.4rem;
-      padding: 0.4rem 0.9rem;
-      font-size: 0.85rem;
+      gap: 0.35rem;
+      padding: 0.35rem 0.75rem;
+      font-size: 0.8rem;
       font-weight: 600;
+      flex-shrink: 0;
+
+      @media (max-width: 480px) {
+        padding: 0.3rem 0.55rem;
+        font-size: 0.75rem;
+      }
     }
 
     .evaluation-banner {
@@ -549,11 +590,12 @@ type MobileTab = 'description' | 'editor' | 'results';
       justify-content: center;
       gap: 0.4rem;
       background: transparent;
-      border: none;
+      border: 1px solid transparent;
       color: var(--text-secondary);
       font-size: 0.8rem;
       font-weight: 600;
-      padding: 0.45rem 0.6rem;
+      padding: 0.45rem 0.5rem;
+      min-height: 40px;
       border-radius: var(--radius-xs);
       cursor: pointer;
       transition: all 120ms ease;
@@ -561,6 +603,7 @@ type MobileTab = 'description' | 'editor' | 'results';
       &.active {
         background-color: var(--bg-primary);
         color: var(--accent-sky);
+        border-color: var(--border-medium);
         box-shadow: var(--shadow-sm);
       }
     }
@@ -587,9 +630,12 @@ type MobileTab = 'description' | 'editor' | 'results';
       @media (max-width: 1024px) {
         display: flex;
         flex-direction: column;
+        flex: 1;
+        min-height: 0;
+        height: 100%;
 
         &.mobile-active-description {
-          .left-pane { display: flex; flex: 1; height: 100%; }
+          .left-pane { display: flex; flex: 1; height: 100%; min-height: 0; }
           .right-pane { display: none; }
         }
 
@@ -599,7 +645,8 @@ type MobileTab = 'description' | 'editor' | 'results';
             display: flex;
             flex: 1;
             height: 100%;
-            .editor-section { display: flex; flex: 1; height: 100%; }
+            min-height: 0;
+            .editor-section { display: flex; flex: 1; height: 100%; min-height: 0; }
             .console-section { display: none; }
           }
         }
@@ -610,8 +657,9 @@ type MobileTab = 'description' | 'editor' | 'results';
             display: flex;
             flex: 1;
             height: 100%;
+            min-height: 0;
             .editor-section { display: none; }
-            .console-section { display: flex; flex: 1; height: 100%; }
+            .console-section { display: flex; flex: 1; height: 100%; min-height: 0; }
           }
         }
       }

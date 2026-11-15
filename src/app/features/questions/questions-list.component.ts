@@ -173,6 +173,10 @@ import { DifficultyBadgeComponent } from '../../shared/components/badges/difficu
       align-items: center;
       gap: 1rem;
       flex-wrap: wrap;
+
+      @media (max-width: 600px) {
+        gap: 0.65rem;
+      }
     }
 
     .search-input-wrapper {
@@ -181,6 +185,10 @@ import { DifficultyBadgeComponent } from '../../shared/components/badges/difficu
       position: relative;
       display: flex;
       align-items: center;
+
+      @media (max-width: 600px) {
+        min-width: 100%;
+      }
 
       svg {
         position: absolute;
@@ -197,11 +205,25 @@ import { DifficultyBadgeComponent } from '../../shared/components/badges/difficu
       display: flex;
       gap: 0.75rem;
       flex-wrap: wrap;
+
+      @media (max-width: 600px) {
+        width: 100%;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.5rem;
+      }
     }
 
     .select-pill {
       width: auto;
       min-width: 150px;
+
+      @media (max-width: 600px) {
+        min-width: 0;
+        width: 100%;
+        font-size: 0.825rem;
+        padding: 0.5rem 0.65rem;
+      }
     }
 
     .topics-row {

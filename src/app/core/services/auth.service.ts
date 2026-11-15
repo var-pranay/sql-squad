@@ -18,7 +18,7 @@ export class AuthService {
   private supabase = inject(SupabaseService);
   private router = inject(Router);
 
-  private readonly AUTH_STORAGE_KEY = 'sql_squad_auth_session';
+  private readonly AUTH_STORAGE_KEY = 'sql_squad_session_v3';
 
   readonly currentUser = signal<AuthUser | null>(null);
   readonly isAuthenticated = computed(() => !!this.currentUser());
@@ -32,6 +32,9 @@ export class AuthService {
   private restoreSession(): void {
     if (typeof localStorage === 'undefined') return;
 
+    // Purge legacy auto-login sessions so all users must explicitly sign in
+    localStorage.removeItem('sql_squad_auth_session');
+
     const stored = localStorage.getItem(this.AUTH_STORAGE_KEY);
     if (stored) {
       try {
@@ -43,7 +46,7 @@ export class AuthService {
       }
     }
 
-    // Do NOT auto-authenticate new visitors: require login first
+    // Require explicit login: default to unauthenticated
     this.currentUser.set(null);
   }
 
@@ -181,6 +184,7 @@ export class AuthService {
     }
     if (typeof localStorage !== 'undefined') {
       localStorage.removeItem(this.AUTH_STORAGE_KEY);
+      localStorage.removeItem('sql_squad_auth_session');
     }
     this.currentUser.set(null);
     this.router.navigate(['/auth/login']);

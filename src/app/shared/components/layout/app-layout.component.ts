@@ -209,6 +209,7 @@ import { StreakBadgeComponent } from '../badges/streak-badge.component';
       display: flex;
       flex-direction: column;
       min-height: 100vh;
+      min-height: 100dvh;
       background-color: var(--bg-app);
     }
 
@@ -223,6 +224,11 @@ import { StreakBadgeComponent } from '../badges/streak-badge.component';
       position: sticky;
       top: 0;
       z-index: 40;
+
+      @media (max-width: 900px) {
+        height: 52px;
+        padding: 0 0.75rem;
+      }
     }
 
     .navbar-left {
@@ -408,7 +414,7 @@ import { StreakBadgeComponent } from '../badges/streak-badge.component';
         display: block;
         position: fixed;
         inset: 0;
-        top: 60px;
+        top: 52px;
         background-color: rgba(0, 0, 0, 0.65);
         backdrop-filter: blur(2px);
         z-index: 25;
@@ -419,6 +425,10 @@ import { StreakBadgeComponent } from '../badges/streak-badge.component';
       display: flex;
       flex: 1;
       min-height: calc(100vh - 60px);
+
+      @media (max-width: 900px) {
+        min-height: calc(100dvh - 52px);
+      }
     }
 
     .app-sidebar {
@@ -433,7 +443,7 @@ import { StreakBadgeComponent } from '../badges/streak-badge.component';
 
       @media (max-width: 900px) {
         position: fixed;
-        top: 60px;
+        top: 52px;
         bottom: 0;
         left: 0;
         z-index: 30;
@@ -516,11 +526,11 @@ import { StreakBadgeComponent } from '../badges/streak-badge.component';
       flex-direction: column;
 
       @media (max-width: 900px) {
-        padding: 0.65rem 0.75rem;
+        padding: 0.4rem 0.5rem;
       }
 
       @media (max-width: 600px) {
-        padding: 0.5rem;
+        padding: 0.3rem 0.4rem;
       }
     }
   `]

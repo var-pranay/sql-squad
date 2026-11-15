@@ -28,13 +28,13 @@ import { ThemeService } from '../../../core/services/theme.service';
     <div class="sql-editor-wrapper">
       <div class="editor-header">
         <div class="header-left">
-          <span class="dialect-badge">
+          <span class="dialect-badge" title="Database Dialect: PostgreSQL 16">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <ellipse cx="12" cy="5" rx="9" ry="3"/>
               <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
               <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
             </svg>
-            PostgreSQL 16
+            <span class="dialect-name">PostgreSQL 16</span>
           </span>
           <span class="shortcut-tip">Press <kbd>Ctrl</kbd> + <kbd>Enter</kbd> to Run</span>
         </div>
@@ -81,7 +81,8 @@ import { ThemeService } from '../../../core/services/theme.service';
             <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
               <polygon points="5 3 19 12 5 21 5 3"/>
             </svg>
-            <span>{{ isRunning ? 'Running...' : 'Run Query' }}</span>
+            <span class="run-text-full">{{ isRunning ? 'Running...' : 'Run Query' }}</span>
+            <span class="run-text-short">{{ isRunning ? '...' : 'Run' }}</span>
           </button>
         </div>
       </div>
@@ -107,11 +108,12 @@ import { ThemeService } from '../../../core/services/theme.service';
       background-color: var(--bg-primary);
       border-bottom: 1px solid var(--border-subtle);
       gap: 0.5rem;
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
       flex-shrink: 0;
 
       @media (max-width: 600px) {
-        padding: 0.4rem 0.5rem;
+        padding: 0.35rem 0.45rem;
+        gap: 0.3rem;
       }
     }
 
@@ -119,6 +121,7 @@ import { ThemeService } from '../../../core/services/theme.service';
       display: flex;
       align-items: center;
       gap: 0.65rem;
+      flex-shrink: 0;
     }
 
     .dialect-badge {
@@ -134,7 +137,11 @@ import { ThemeService } from '../../../core/services/theme.service';
 
       @media (max-width: 480px) {
         font-size: 0.7rem;
-        padding: 0.15rem 0.4rem;
+        padding: 0.2rem 0.35rem;
+
+        .dialect-name {
+          display: none;
+        }
       }
     }
 
@@ -159,6 +166,11 @@ import { ThemeService } from '../../../core/services/theme.service';
       display: flex;
       align-items: center;
       gap: 0.4rem;
+      flex-shrink: 0;
+
+      @media (max-width: 480px) {
+        gap: 0.25rem;
+      }
     }
 
     .btn-sm {
@@ -169,8 +181,21 @@ import { ThemeService } from '../../../core/services/theme.service';
       font-size: 0.775rem;
 
       @media (max-width: 480px) {
-        padding: 0.25rem 0.45rem;
+        padding: 0.25rem 0.4rem;
         font-size: 0.725rem;
+      }
+    }
+
+    .run-text-short {
+      display: none;
+    }
+
+    @media (max-width: 480px) {
+      .run-text-full {
+        display: none;
+      }
+      .run-text-short {
+        display: inline;
       }
     }
 
