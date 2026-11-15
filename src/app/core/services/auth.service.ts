@@ -19,6 +19,7 @@ export class AuthService {
   private router = inject(Router);
 
   private readonly AUTH_STORAGE_KEY = 'sql_squad_session_v3';
+  private readonly KNOWN_USERS_KEY = 'sql_squad_known_users_v1';
 
   readonly currentUser = signal<AuthUser | null>(null);
   readonly isAuthenticated = computed(() => !!this.currentUser());
@@ -27,6 +28,27 @@ export class AuthService {
 
   constructor() {
     this.restoreSession();
+  }
+
+  private getKnownUsers(): Record<string, string> {
+    if (typeof localStorage === 'undefined') return {};
+    try {
+      const raw = localStorage.getItem(this.KNOWN_USERS_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  }
+
+  rememberUserIdentifier(username: string, email: string): void {
+    if (!username || !email || typeof localStorage === 'undefined') return;
+    try {
+      const map = this.getKnownUsers();
+      map[username.toLowerCase().trim()] = email.toLowerCase().trim();
+      localStorage.setItem(this.KNOWN_USERS_KEY, JSON.stringify(map));
+    } catch (e) {
+      console.warn('Failed to cache user identifier:', e);
+    }
   }
 
   private restoreSession(): void {
@@ -77,34 +99,94 @@ export class AuthService {
     }
   }
 
-  async login(email: string, pass: string): Promise<{ success: boolean; error?: string }> {
+  async login(identifier: string, pass: string): Promise<{ success: boolean; error?: string }> {
+    const rawIdentifier = identifier.trim();
+    let emailToUse = rawIdentifier;
+
     if (!this.supabase.isDemoMode && this.supabase.clientInstance) {
+      // If identifier doesn't have '@', user entered a username
+      if (!rawIdentifier.includes('@')) {
+        let resolvedEmail: string | null = null;
+
+        // 1. Try Supabase RPC 'get_email_by_username'
+        try {
+          const { data: rpcEmail, error: rpcError } = await this.supabase.clientInstance
+            .rpc('get_email_by_username', { p_username: rawIdentifier });
+          if (!rpcError && rpcEmail) {
+            resolvedEmail = rpcEmail;
+          }
+        } catch {
+          // RPC might not be created yet
+        }
+
+        // 2. Try selecting 'email' column from public.profiles
+        if (!resolvedEmail) {
+          try {
+            const { data: prof, error: profError } = await this.supabase.clientInstance
+              .from('profiles')
+              .select('email, id')
+              .ilike('username', rawIdentifier)
+              .maybeSingle();
+
+            if (!profError && prof && (prof as any).email) {
+              resolvedEmail = (prof as any).email;
+            }
+          } catch {
+            // column might not exist yet
+          }
+        }
+
+        // 3. Fallback: check locally remembered username -> email mappings
+        if (!resolvedEmail) {
+          const knownUsers = this.getKnownUsers();
+          const cached = knownUsers[rawIdentifier.toLowerCase()];
+          if (cached) {
+            resolvedEmail = cached;
+          }
+        }
+
+        if (resolvedEmail) {
+          emailToUse = resolvedEmail;
+        } else {
+          return {
+            success: false,
+            error: `Could not find an account for username "${rawIdentifier}". Please check the username or sign in using your registered email address.`
+          };
+        }
+      }
+
       const { data, error } = await this.supabase.clientInstance.auth.signInWithPassword({
-        email,
+        email: emailToUse,
         password: pass
       });
       if (error) return { success: false, error: error.message };
+
+      const userMetaUsername = data.user.user_metadata?.['username'] || emailToUse.split('@')[0];
+      this.rememberUserIdentifier(userMetaUsername, emailToUse);
 
       const { data: roleData } = await this.supabase.clientInstance
         .from('user_roles')
         .select('role')
         .eq('user_id', data.user.id)
-        .single();
+        .maybeSingle();
 
       // Ensure profile exists in public.profiles table
+      let profileUsername = userMetaUsername;
       try {
         const { data: prof } = await this.supabase.clientInstance
           .from('profiles')
-          .select('id')
+          .select('id, username')
           .eq('id', data.user.id)
-          .single();
+          .maybeSingle();
 
-        if (!prof) {
-          const uname = data.user.user_metadata?.['username'] || email.split('@')[0];
+        if (prof?.username) {
+          profileUsername = prof.username;
+          this.rememberUserIdentifier(profileUsername, emailToUse);
+        } else {
           await this.supabase.clientInstance.from('profiles').upsert({
             id: data.user.id,
-            username: uname,
-            full_name: data.user.user_metadata?.['full_name'] || uname,
+            username: profileUsername,
+            full_name: data.user.user_metadata?.['full_name'] || profileUsername,
             current_streak: 0,
             max_streak: 0
           });
@@ -115,8 +197,8 @@ export class AuthService {
 
       const authUser: AuthUser = {
         id: data.user.id,
-        email: data.user.email || email,
-        username: data.user.user_metadata?.['username'] || email.split('@')[0],
+        email: data.user.email || emailToUse,
+        username: profileUsername,
         role: roleData?.role || 'user'
       };
 
@@ -124,15 +206,15 @@ export class AuthService {
       return { success: true };
     }
 
-    const isAdminAccount = email.toLowerCase().includes('admin');
+    const isAdminAccount = rawIdentifier.toLowerCase().includes('admin');
     const user: AuthUser = {
       id: isAdminAccount ? 'demo-admin-1' : 'demo-user-1',
-      email,
-      username: isAdminAccount ? 'admin_boss' : 'alex_codes',
+      email: rawIdentifier.includes('@') ? rawIdentifier : `${rawIdentifier}@sqlsquad.dev`,
+      username: rawIdentifier.includes('@') ? rawIdentifier.split('@')[0] : rawIdentifier,
       role: isAdminAccount ? 'admin' : 'user',
       profile: {
         id: isAdminAccount ? 'demo-admin-1' : 'demo-user-1',
-        username: isAdminAccount ? 'admin_boss' : 'alex_codes',
+        username: rawIdentifier.includes('@') ? rawIdentifier.split('@')[0] : rawIdentifier,
         full_name: isAdminAccount ? 'Platform Administrator' : 'Alex Rivera',
         avatar_url: null,
         bio: isAdminAccount ? 'Managing SQL challenges' : 'Software Engineer',
@@ -154,6 +236,8 @@ export class AuthService {
     username: string,
     fullName: string
   ): Promise<{ success: boolean; error?: string }> {
+    this.rememberUserIdentifier(username, email);
+
     if (!this.supabase.isDemoMode && this.supabase.clientInstance) {
       const { data, error } = await this.supabase.clientInstance.auth.signUp({
         email,

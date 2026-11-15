@@ -36,16 +36,17 @@ import { AuthService } from '../../../core/services/auth.service';
 
         <form [formGroup]="loginForm" (ngSubmit)="onSubmit()" class="auth-form">
           <div class="form-group">
-            <label class="form-label" for="email">Email Address</label>
+            <label class="form-label" for="identifier">Email or Username</label>
             <input
-              id="email"
-              type="email"
+              id="identifier"
+              type="text"
               class="form-control"
-              placeholder="alex@sqlsquad.dev"
-              formControlName="email"
+              placeholder="name@example.com or username"
+              formControlName="identifier"
+              autocomplete="username"
             />
-            @if (loginForm.get('email')?.touched && loginForm.get('email')?.invalid) {
-              <span class="form-error">Please enter a valid email address.</span>
+            @if (loginForm.get('identifier')?.touched && loginForm.get('identifier')?.invalid) {
+              <span class="form-error">Please enter your email or username.</span>
             }
           </div>
 
@@ -179,7 +180,7 @@ export class LoginComponent {
   errorMessage = signal<string | null>(null);
 
   loginForm = this.fb.group({
-    email: ['', [Validators.required, Validators.email]],
+    identifier: ['', [Validators.required]],
     password: ['', [Validators.required, Validators.minLength(6)]]
   });
 
@@ -189,8 +190,8 @@ export class LoginComponent {
     this.isLoading.set(true);
     this.errorMessage.set(null);
 
-    const { email, password } = this.loginForm.value;
-    const res = await this.auth.login(email!, password!);
+    const { identifier, password } = this.loginForm.value;
+    const res = await this.auth.login(identifier!.trim(), password!);
 
     this.isLoading.set(false);
     if (res.success) {
@@ -200,7 +201,7 @@ export class LoginComponent {
         this.router.navigate(['/dashboard']);
       }
     } else {
-      this.errorMessage.set(res.error || 'Invalid email or password.');
+      this.errorMessage.set(res.error || 'Invalid credentials.');
     }
   }
 }
