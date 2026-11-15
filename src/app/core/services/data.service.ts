@@ -65,7 +65,17 @@ export class DataService {
 
       const { data, error } = await query.order('created_at', { ascending: false });
       if (error) throw error;
-      questions = (data || []).map(q => this.normalizeQuestion(q));
+      const remoteQuestions = (data || []).map(q => this.normalizeQuestion(q));
+
+      // Also merge any questions created/edited locally in Question Studio
+      const localQuestions = this.getLocal<Question[]>(this.STORAGE_QUESTIONS_KEY, []);
+      const remoteSlugs = new Set(remoteQuestions.map(q => q.slug));
+      const remoteIds = new Set(remoteQuestions.map(q => q.id));
+      const customLocal = localQuestions.filter(
+        lq => !remoteSlugs.has(lq.slug) && !remoteIds.has(lq.id)
+      );
+
+      questions = [...customLocal, ...remoteQuestions];
     } else {
       questions = this.getLocal<Question[]>(this.STORAGE_QUESTIONS_KEY, []);
     }
@@ -105,8 +115,9 @@ export class DataService {
         `)
         .eq('slug', slug)
         .single();
-      if (error) return null;
-      return this.normalizeQuestion(data);
+      if (!error && data) {
+        return this.normalizeQuestion(data);
+      }
     }
 
     const all = this.getLocal<Question[]>(this.STORAGE_QUESTIONS_KEY, []);
